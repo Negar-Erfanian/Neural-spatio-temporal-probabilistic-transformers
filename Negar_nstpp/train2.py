@@ -58,6 +58,11 @@ event_out = args.event_out
 regularizer1 = 0.1
 regularizer2 = 0.1
 
+if dataset == 'earthquake':
+    dim = 3
+elif dataset in ['covid19', 'citibike']:
+    dim = 2
+
 all_experiments = 'experiment_results/'
 if not os.path.exists(all_experiments):
     os.mkdir(all_experiments)
@@ -119,7 +124,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             num_heads=num_heads,
             fc_dim=32,
             dim_out_time=1,
-            dim_out_loc=3,
+            dim_out_loc=dim,
             max_positional_encoding_input=event_in,
             max_positional_encoding_target=event_out,
             time_layer_prob = time_layer_prob
@@ -144,10 +149,6 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
     def batch_processing(batch, dataset):
         ds_in, ds_out = batch
         norm = Normalization(mean=mean, variance=std**2)
-        if dataset == 'earthquake':
-            dim = 3
-        elif dataset in ['covid19', 'citibike']:
-            dim = 2
         ds_time_in, ds_locationmag_in, ds_timediff_in = ds_in[:, :, 0], ds_in[:, :, 1:dim+2], ds_in[:, :, dim+2][..., tf.newaxis]
         ds_locationmag_in = norm(ds_locationmag_in)
         ds_time_in = tf.divide(

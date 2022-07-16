@@ -95,7 +95,7 @@ class HawkesPointProcess(tf.keras.Model):
         return expected
 
 
-'''class SelfCorrectingPointProcess(tf.keras.Model):
+class SelfCorrectingPointProcess(tf.keras.Model):
 
     def __init__(self):
         super(SelfCorrectingPointProcess, self).__init__()
@@ -130,7 +130,7 @@ class HawkesPointProcess(tf.keras.Model):
             N_i += tf.ones_like(input_time)[:, i]
         compensator = compensator + tf.math.exp(-beta * N_i) / mu * (tf.math.exp(mu * t1) - tf.math.exp(mu * t0_i))
         dist = lamb*tf.math.exp(-compensator)
-        return (loglik - compensator), dist, lamb'''  # (N,)
+        return (loglik - compensator), dist, lamb  # (N,)
 
 
 def lowtri(A):
