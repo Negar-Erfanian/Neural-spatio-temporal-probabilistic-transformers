@@ -211,7 +211,10 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                         # +regularizer1*tf.norm(tf.math.subtract(train_ds_timediff_out,ds_out_pred_time), ord=1)+ regularizer2*tf.norm(tf.math.subtract(train_ds_loc_out,ds_out_pred_loc), ord=2)
                         grads = tape.gradient(loss, model.trainable_variables)
                 else:
-                    pass
+                    with tf.GradientTape() as tape:
+                        loss, train_expected_times, train_expected_loc_func = model(train_ds_in_stack, train_ds_out_stack)
+                        tape.watch(model.trainable_variables)
+                        grads = tape.gradient(loss, model.trainable_variables)
 
                 train_loss_metric.update_state(loss)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -238,8 +241,9 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                             model(val_ds_in_stack, val_ds_out_stack, False, val_ds_in_lookaheadmask, val_ds_out_lookaheadmask)
                         loss_val = -tf.reduce_mean(val_bij_time.log_prob(val_ds_timediff_out)) - tf.reduce_mean(val_bij_loc)
 
+
                     else:
-                        pass
+                        loss_val, val_expected_times, val_expected_loc_func = model()
                     val_loss_metric(loss_val)
 
                     #print(f'we have time prediction outputs and true outputs in validation as {val_ds_out_pred_time[0]} and {val_ds_timediff_out[0]}')
@@ -303,6 +307,8 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
                 loss_test = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out)) + \
                             -tf.reduce_mean(test_bij_loc) # +regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
+            else:
+                loss_test, test_expected_times, test_expected_loc_func = model()
 
             test_loss_metric(loss_test)
 
