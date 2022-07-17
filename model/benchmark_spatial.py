@@ -56,6 +56,7 @@ class GaussianMixtureSpatialModel(tf.keras.Model):
         return tf.concat([loglik0[..., None], loglik[:, 1:]], axis=1)  # (N, T)
 
     def spatial_conditional_logprob_fn(self, t, input_time, input_loc):
+        print(f'shapes are {t.shape}, {input_time.shape}, {input_loc.shape}')
         """
         Args:
             t: scalar
@@ -67,8 +68,8 @@ class GaussianMixtureSpatialModel(tf.keras.Model):
         if input_loc is None:
             return lambda s: tf.reduce_sum(gaussian_loglik(s, self.mu0[None], self.logstd0[None]), -1)
 
-        dt = t - tf.squeeze(input_time,-1)
-        logweights = tf.nn.log_softmax(-dt / tf.nn.softplus(self.coeff_decay), axis=1)
+        dt = t - input_time  #(T,)
+        logweights = tf.nn.log_softmax(-dt / tf.nn.softplus(self.coeff_decay), axis=0)
 
         def loglikelihood_fn(s):
             loglik = tf.reduce_sum(gaussian_loglik(s[:, None], input_loc[None], self.spatial_logstd), -1)

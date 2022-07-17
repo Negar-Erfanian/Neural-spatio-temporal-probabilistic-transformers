@@ -113,6 +113,57 @@ def plot_expected_intensity(bij_time, timediff_out, savepath, count):
     plt.savefig(f'{savepath}/test_batch{count}.png')
 
     plt.close()
+def plot_expected_density_gmm(curr_time, input_time, history_data, expected_data, model, curr_path, savepath, count, idx):
+    N = 85
+    stacks = []
+    normalized_data = np.concatenate([history_data, expected_data], axis=0)
+    minx, maxx = tf.math.reduce_min(normalized_data[:, 0]), tf.math.reduce_max(normalized_data[:, 0])
+    miny, maxy = tf.math.reduce_min(normalized_data[:, 1]), tf.math.reduce_max(normalized_data[:, 1])
+    minz, maxz = tf.math.reduce_min(normalized_data[:, 2]), tf.math.reduce_max(normalized_data[:, 2])
+
+    xlim = np.linspace(minx, maxx, N)
+    ylim = np.linspace(miny, maxy, N)
+    zlim = np.linspace(minz, maxz, N)
+
+    X1, X2, X3 = np.meshgrid(xlim, ylim, zlim)
+    arr = np.stack([X1.reshape(-1), X2.reshape(-1), X3.reshape(-1)], axis=1)
+    loglikelihood_fn = model.spatial_model.spatial_conditional_logprob_fn(curr_time, input_time, history_data)
+    loglikelihood = loglikelihood_fn(arr)
+    print(f'loglikelihood shape is {loglikelihood.shape}')
+    loglikelihood = loglikelihood.reshape(N, N, N)
+    fig = plt.figure(figsize=(18, 8))
+    im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))
+
+    ax = fig.add_subplot(2,1, 1)
+    # plot background
+    ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
+                          np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
+    ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, 0] * 100, levels=800, alpha=0.7, cmap='RdGy')
+
+    ax.scatter(history_data[-10:, 0], history_data[-10:, 1], marker='*', color='black', s=70)
+    ax.scatter(expected_data[0,0], expected_data[0,1], marker='o', color='green', s=100)
+
+    ax = fig.add_subplot(2, 1, 2, projection='3d')
+    ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, -1], levels=800, alpha=0.7, cmap='RdGy',
+                zdir='z', offset=zlim[-1])
+    ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, int(expected_data[0, 2])] * 1000,
+                levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=expected_data[0, 2])
+    ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, 0], levels=800, alpha=0.7, cmap='RdGy',
+                zdir='z', offset=zlim[0])
+
+    ax.scatter3D(history_data[-10:, 0], history_data[-10:, 1], history_data[-10:, 2], marker='*', color='black',
+                 s=150)
+    ax.scatter3D(expected_data[0, 0], expected_data[0, 1], expected_data[0, 2], marker='o',
+                 color='green', s=400)
+    ax.set_zlim(minz, maxz)
+    ax.view_init(+25, -140)
+
+    fig.tight_layout()
+    # fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)
+    plt.savefig(f'{savepath}/test_batch{count}_{idx}.png')
+
+    plt.close()
+
 
 
 def plot_expected_density(history_data, expected_data, model, curr_path, dec_dist_loc, savepath, count, idx):

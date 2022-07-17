@@ -23,7 +23,7 @@ np_config.enable_numpy_behavior()
 from model.functions import create_look_ahead_mask
 from model.transformer import Transformer
 from model.benchmark_spatiotemporal import Spatiotemporal
-from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_density
+from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_density, plot_expected_density_gmm
 from data.load_data import data_generation
 
 from utils import *
@@ -249,9 +249,9 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
                     else:
                         loss_val, val_expected_times = model(val_ds_in_stack, val_ds_out_stack)
+                        print(f'we have time prediction outputs and true outputs as {val_expected_times[:, 0]} and {val_ds_time_out[0]}')
+
                     val_loss_metric(loss_val)
-                    print(
-                        f'we have time prediction outputs and true outputs as {val_expected_times[:, 0]} and {val_ds_time_out[0]}')
                     #print(f'we have time prediction outputs and true outputs in validation as {val_ds_out_pred_time[0]} and {val_ds_timediff_out[0]}')
                     #print(f'we have loc prediction outputs and true outputs in validation as {val_ds_out_pred_loc[0, :, 0]} and {val_ds_loc_out[0, :, 0]}')
                     #print('val loss is', val_loss_metric.result().numpy())
@@ -314,14 +314,20 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 loss_test = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out)) + \
                             -tf.reduce_mean(test_bij_loc) # +regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
             else:
-                loss_test, test_expected_times = model()
+                loss_test, test_expected_times = model(test_ds_in_stack, test_ds_out_stack)
+                print(f'we have time prediction outputs and true outputs as {test_expected_times[:, 0]} and {test_ds_time_out[0]}')
+                idx = -1
+                curr_path = os.getcwd()
+                experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
+                if os.path.exists(experiments_figs_loc_gmm) == False:
+                    os.mkdir(experiments_figs_loc_gmm)
+                plot_expected_density_gmm(test_ds_time_in[idx,-1,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,0,:][tf.newaxis], model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+
 
             test_loss_metric(loss_test)
 
-            print(
-                f'we have time prediction outputs and true outputs in test as {test_ds_out_pred_time[0]} and {test_ds_timediff_out[0]}')
-            print(
-                f'we have loc prediction outputs and true outputs in test as {test_ds_out_pred_loc[0, :, 0]} and {test_ds_loc_out[0, :, 0]}')
+            #print(f'we have time prediction outputs and true outputs in test as {test_ds_out_pred_time[0]} and {test_ds_timediff_out[0]}')
+            #print(f'we have loc prediction outputs and true outputs in test as {test_ds_out_pred_loc[0, :, 0]} and {test_ds_loc_out[0, :, 0]}')
             print('test loss is', test_loss_metric.result().numpy())
             test_losses.append(test_loss_metric.result().numpy())
             with test_summary_writer.as_default():
@@ -341,7 +347,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 os.mkdir(experiments_figs_scores)
             plot_att_scores(test_att_weights_dec_time, savepath = experiments_figs_scores, count = count, mag = mag)'''
 
-            experiments_figs_time = exp_path + '/time_pred/'
+            '''experiments_figs_time = exp_path + '/time_pred/'
             if os.path.exists(experiments_figs_time) == False:
                 os.mkdir(experiments_figs_time)
             plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_ds_out_pred_time, test_bij_time,
@@ -362,7 +368,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
             plot_expected_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx], model=model,
                                   curr_path=curr_path, dec_dist_loc=test_dec_dist_loc, savepath=experiments_figs_loc,
-                                  count=count, idx=idx)
+                                  count=count, idx=idx)'''
 
             #####################
 
