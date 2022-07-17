@@ -38,10 +38,10 @@ class Spatiotemporal(tf.keras.Model):
         output_time, output_loc, output_mag, output_timediff = outputs
         true_time = tf.squeeze(output_time[:,0], -1)
         true_loc = output_loc[:,0]
-        temporal_loglik, lamb = self.temporal_model(input_time)
-        spatial_loglik, dist = self.spatial_model(inputs)
+        temporal_loglik, lamb = self.temporal_model.call(input_time)
+        spatial_loglik = self.spatial_model.call(input_time, input_loc)
 
         loss = -tf.reduce_mean(temporal_loglik)-tf.reduce_mean(spatial_loglik)
         expected_times = self.temporal_model.predict(input_time, output_time)
-        expected_loc_func = self.spatial_modelspatial_conditional_logprob_fn(self, true_time, inputs)
-        return loss, expected_times, expected_loc_func
+        #expected_loc_func = self.spatial_modelspatial_conditional_logprob_fn(self, true_time, inputs)
+        return loss, expected_times#, expected_loc_func

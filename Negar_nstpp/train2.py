@@ -66,10 +66,14 @@ elif dataset in ['covid19', 'citibike']:
 all_experiments = 'experiment_results/'
 if not os.path.exists(all_experiments):
     os.mkdir(all_experiments)
-
+print(f'model_type is {model_type}')
 # experiment path
-exp_path = all_experiments +f'{dataset}_' + f'{num_heads}heads_' + f'{num_layers}layers_' + f'{event_num}events_' \
-           + f'{event_out}events_out_' + f'{time_layer_prob}_softsign_{loc_layer_prob}_RealNVP_noreg'
+if model_type == 'transformer':
+    exp_path = all_experiments +f'{dataset}_' +f'{model_type}_' + f'{num_heads}heads_' + f'{num_layers}layers_' + f'{event_num}events_' \
+               + f'{event_out}events_out_' + f'{time_layer_prob}_softsign_{loc_layer_prob}_RealNVP_noreg'
+else:
+    exp_path = all_experiments + f'{dataset}_' + f'{model_type}_' +f'{temporal_model}_' +f'{spatial_model}_' + f'{num_heads}heads_' + f'{num_layers}layers_' + f'{event_num}events_' \
+               + f'{event_out}events_out_' + f'{time_layer_prob}_softsign_{loc_layer_prob}_RealNVP_noreg'
 
 if os.path.exists(exp_path) and remove_all:
     shutil.rmtree(exp_path)
@@ -213,7 +217,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                         grads = tape.gradient(loss, model.trainable_variables)
                 else:
                     with tf.GradientTape() as tape:
-                        loss, train_expected_times, train_expected_loc_func = model(train_ds_in_stack, train_ds_out_stack)
+                        loss, train_expected_times = model(train_ds_in_stack, train_ds_out_stack)
                         tape.watch(model.trainable_variables)
                         grads = tape.gradient(loss, model.trainable_variables)
 
@@ -234,7 +238,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                         gc.collect()
                     val_ds_in_stack, val_ds_out_stack, val_mask_in, val_mask_out = batch_processing(val_batch, dataset)
 
-                    _, val_ds_loc_out, _, val_ds_timediff_out = val_ds_out_stack
+                    val_ds_time_out, val_ds_loc_out, _, val_ds_timediff_out = val_ds_out_stack
                     val_ds_in_lookaheadmask = val_mask_in
                     val_ds_out_lookaheadmask = val_mask_out
                     if model_type =='transformer':
@@ -244,9 +248,10 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
 
                     else:
-                        loss_val, val_expected_times, val_expected_loc_func = model()
+                        loss_val, val_expected_times = model(val_ds_in_stack, val_ds_out_stack)
                     val_loss_metric(loss_val)
-
+                    print(
+                        f'we have time prediction outputs and true outputs as {val_expected_times[:, 0]} and {val_ds_time_out[0]}')
                     #print(f'we have time prediction outputs and true outputs in validation as {val_ds_out_pred_time[0]} and {val_ds_timediff_out[0]}')
                     #print(f'we have loc prediction outputs and true outputs in validation as {val_ds_out_pred_loc[0, :, 0]} and {val_ds_loc_out[0, :, 0]}')
                     #print('val loss is', val_loss_metric.result().numpy())
@@ -309,7 +314,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 loss_test = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out)) + \
                             -tf.reduce_mean(test_bij_loc) # +regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
             else:
-                loss_test, test_expected_times, test_expected_loc_func = model()
+                loss_test, test_expected_times = model()
 
             test_loss_metric(loss_test)
 

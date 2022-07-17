@@ -7,9 +7,9 @@ def get_args():
     parser.add_argument('--num-epochs', type=int, default=1000, help='number of epochs to train for')
     parser.add_argument('--batch-size', type=int, default=32, help='batch_size')
     parser.add_argument('--dataset', type=str, default='earthquake', help='which dataset to work with')
-    parser.add_argument('--model-type', type=str, default='transformer', help='which model to work with')
-    parser.add_argument('--temporal-model', type=str, default='Hawkesppp', help='which temporal model to work with as benchmark')
-    parser.add_argument('--spatial-model', type=str, default='gmm', help='which spatial model to work with as benchmark')
+    parser.add_argument('--model-type', type=str, default='benchmark', help='which model to work with') #'transformer', 'benchmark'
+    parser.add_argument('--temporal-model', type=str, default='Homoppp', help='which temporal model to work with as benchmark')  #'Homoppp', 'Hawkesppp','Selfppp'
+    parser.add_argument('--spatial-model', type=str, default='gmm', help='which spatial model to work with as benchmark') #'gmm', 'cond_gmm'
     parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
     parser.add_argument('--num-layers', type=int, default=6, help='number of layers of the encoder and decoder in the transformer architecture')
     parser.add_argument('--num-heads', type=int, default=6, help='number of heads for the attention model')
