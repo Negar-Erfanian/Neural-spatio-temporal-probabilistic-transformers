@@ -23,7 +23,7 @@ np_config.enable_numpy_behavior()
 from model.functions import create_look_ahead_mask
 from model.transformer import Transformer
 from model.benchmark_spatiotemporal import Spatiotemporal
-from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_density, plot_expected_density_gmm
+from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_3d_density, plot_expected_3d_density_gmm
 from data.load_data import data_generation
 
 from utils import *
@@ -134,7 +134,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             time_layer_prob = time_layer_prob
         )
     else:
-        model = Spatiotemporal(temporal_model, spatial_model)
+        model = Spatiotemporal(temporal_model, spatial_model, dim)
 
 
 
@@ -295,7 +295,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
         print(f'we are in test now and model is {model}')
         count = 0
         test_losses = []
-        for test_batch in train_dataset:
+        for test_batch in test_dataset:
             for i in range(5):
                 gc.collect()
 
@@ -303,9 +303,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
             test_ds_in_stack, test_ds_out_stack, test_ds_in_lookaheadmask, test_ds_out_lookaheadmask = batch_processing(
                 test_batch, dataset)
-
             test_ds_time_in, test_ds_loc_in, test_ds_mag_in, test_ds_timediff_in = test_ds_in_stack
-
             test_ds_time_out, test_ds_loc_out, test_ds_mag_out, test_ds_timediff_out = test_ds_out_stack
             if model_type =='transformer':
                 test_dec_dist_time, test_ds_out_pred_time, test_bij_time, test_dec_dist_loc, test_ds_out_pred_loc, test_bij_loc, test_att_weights_dec_time, test_att_weights_enc = model(
@@ -321,7 +319,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
                 if os.path.exists(experiments_figs_loc_gmm) == False:
                     os.mkdir(experiments_figs_loc_gmm)
-                plot_expected_density_gmm(test_ds_time_in[idx,-1,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,0,:][tf.newaxis], model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
 
 
             test_loss_metric(loss_test)
@@ -366,7 +364,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
             idx = -1
 
-            plot_expected_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx], model=model,
+            plot_expected_3d_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx], model=model,
                                   curr_path=curr_path, dec_dist_loc=test_dec_dist_loc, savepath=experiments_figs_loc,
                                   count=count, idx=idx)'''
 

@@ -55,7 +55,8 @@ class GaussianMixtureSpatialModel(tf.keras.Model):
         loglik = tf.reduce_logsumexp(pairwise_logliks + dt_logdecay, axis=-1)  # (N, T)
         return tf.concat([loglik0[..., None], loglik[:, 1:]], axis=1)  # (N, T)
 
-    def spatial_conditional_logprob_fn(self, t, input_time, input_loc):
+
+    def spatial_conditional_logprob_fn(self, t, input_time, input_loc, aux_state=None):
         print(f'shapes are {t.shape}, {input_time.shape}, {input_loc.shape}')
         """
         Args:
@@ -179,9 +180,11 @@ def gmm_sample(params):
     mix_logits, means, logstds = params[..., 0, :], params[..., 1, :], params[..., 2, :]
     mix_logprobs = mix_logits - tf.reduce_logsumexp(mix_logits, axis=-1, keepdims=True)
     samples_for_all_clusters = gaussian_sample(means, logstds)    # (-1, n_mixtures)
-    cluster_idx = tfp.distributions.Multinomial(tf.math.exp(mix_logprobs), 1).reshape(-1)  # (-1,)
-    cluster_idx = tf.one_hot(cluster_idx, num_classes=n_mixtures)  # (-1, n_mixtures)
-    select_sample = tf.reduce_sum(samples_for_all_clusters * cluster_idx.to(samples_for_all_clusters), dim=-1)
+    cluster_idx = tfd.Multinomial(4, tf.math.exp(mix_logprobs)).sample(1).reshape(-1)  # (-1,)
+    print(f'samples_for_all_clusters is {samples_for_all_clusters.shape}')
+    print(f'cluster_idx is {cluster_idx.shape}')
+    cluster_idx = tf.one_hot(tf.cast(cluster_idx, tf.int32), depth=n_mixtures)  # (-1, n_mixtures)
+    select_sample = tf.reduce_sum(samples_for_all_clusters * tf.cast(cluster_idx, samples_for_all_clusters.dtype), axis=-1)
     return select_sample
 
 
@@ -190,7 +193,7 @@ def gmm_sample(params):
 def gaussian_sample(mean, log_std):
     mean = mean + tf.Variable(0.)
     log_std = log_std + tf.Variable(0.)
-    z = tf.random.normal(mean) * tf.math.exp(log_std) + mean
+    z = tf.random.normal(mean.shape, mean = mean) * tf.math.exp(log_std) + mean
     return z
 
 
@@ -201,17 +204,16 @@ ACTFNS = {
 }
 
 
-def mlp(dim=2, hidden_dims=[64, 64, 64], out_dim=None, actfn="softplus"):
+def mlp(dim=2, hidden_dims=[], out_dim=None, actfn='softplus'):
     out_dim = out_dim or dim
     if hidden_dims:
         dims = [dim] + list(hidden_dims)
         layers = []
         for d_in, d_out in zip(dims[:-1], dims[1:]):
-            layers.append(tfk.layers.linear(d_in, d_out))
-            layers.append(ACTFNS[actfn]())
-        layers.append(tfk.layers.Linear(hidden_dims[-1], out_dim))
+            layers.append(tfk.layers.Dense(d_out, activation = actfn))
+        layers.append(tfk.layers.Dense(out_dim))
     else:
-        layers = [tfk.layers.Linear(dim, out_dim)]
+        layers = [tfk.layers.Dense(out_dim)]
 
     return tfk.models.Sequential(*layers)
 

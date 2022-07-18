@@ -91,7 +91,6 @@ class HawkesPointProcess(tf.keras.Model):
     def predict(self, input_time, output_time):
 
         num_output = output_time.shape[1]
-        input_time = tf.squeeze(input_time, -1)
         output_time = tf.squeeze(output_time, -1)
         expected = []
         initial = tf.broadcast_to([0.], [output_time.shape[0]])[...,tf.newaxis]
@@ -112,8 +111,7 @@ class SelfCorrectingPointProcess(tf.keras.Model):
         self.mu = tf.Variable(tf.random.normal([1]) * 0.5 )
         self.beta = tf.Variable(tf.random.normal([1]) * 0.5)
 
-    def call(self, inputs):
-        input_time, input_loc, input_mag, input_timediff = inputs
+    def call(self, input_time):
 
         N, T, _ = input_time.shape
         input_time = tf.reshape(input_time, (N,T))
@@ -127,19 +125,32 @@ class SelfCorrectingPointProcess(tf.keras.Model):
         lamb = tf.math.exp(loglik)
         loglik = tf.reduce_sum(loglik, -1)  # (N,)
 
-        t0_i = input_time[:, 0]
-        N_i = tf.cast(tf.zeros(N), input_time.dtype)
-        compensator = tf.cast(tf.zeros(N), input_time.dtype)
+        t0_i = input_time[:, 0] #(N,)
+        N_i = tf.cast(tf.zeros(N), input_time.dtype) #(N,)
+        compensator = tf.cast(tf.zeros(N), input_time.dtype) #(N,)
         for i in range(1, T):
-            t1_i = input_time[:, i]
+            t1_i = input_time[:, i] #(N,)
             compensator = compensator + tf.math.exp(-beta * N_i) / mu * (
-                        tf.math.exp(mu * t1_i) - tf.math.exp(mu * t0_i))
+                    tf.math.exp(mu * t1_i) - tf.math.exp(mu * t0_i))  #(N,)
 
             t0_i = input_time[:, i]
-            N_i += tf.ones_like(input_time)[:, i]
-        compensator = compensator + tf.math.exp(-beta * N_i) / mu * (tf.math.exp(mu * t1) - tf.math.exp(mu * t0_i))
-        dist = lamb*tf.math.exp(-compensator)
-        return (loglik - compensator), dist, lamb  # (N,)
+            N_i += tf.ones_like(input_time)[:, i] #(N,)
+        return (loglik - compensator), lamb  # (N,)
+
+    def predict(self, input_time, output_time):
+
+        _, lamb = self.call(input_time)
+        num_output = output_time.shape[1]
+        output_time = tf.squeeze(output_time, -1)
+        expected = []
+        initial = tf.broadcast_to([0.], [output_time.shape[0]])[..., tf.newaxis]
+        for i in range(num_output):
+            t_range = tf.linspace(initial[:, -1], output_time[:, -1], 1000, axis=-1)
+            predicted = tf.reduce_sum(t_range * lamb, -1)
+            expected.append(predicted)
+            initial = tf.concat([initial, predicted[..., tf.newaxis]], -1)
+        expected = tf.convert_to_tensor(expected)
+        return expected
 
 
 def lowtri(A):
