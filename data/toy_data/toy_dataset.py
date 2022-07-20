@@ -22,7 +22,8 @@ def generate(mhp, data_fn, ndim, num_classes):
     seq[:, 0] = event_times
     for i, data_i in enumerate(np.split(data, num_classes, axis=0)):
         seq[:, 1:ndim + 1] = seq[:, 1:ndim + 1] + data_i * (i == classes)[:, None]
-        seq[:, ndim + 1:ndim + 2] = i+1
+        seq[(i == classes), ndim + 1:ndim + 2] = i+1
+    print(f'seq[:, ndim + 1:ndim + 2] is {seq[:, -1]}')
     return seq
 
 
@@ -74,13 +75,14 @@ def process_data_pinwheel(event_num, num_classes):
     with temporary_seed(13579):
         data_fn = partial(pinwheel, num_classes=num_classes)
         data_set = generate(mhp, data_fn, ndim=2, num_classes=num_classes)
+    print(data_set[:,-1])
     mean = np.mean(data_set[:, 1:4], axis=0)
     std = np.std(data_set[:, 1:4], axis=0)
     time_diff.append(data_set[0,0])
     for i in range(data_set.shape[0] - 1):
         time_diff.append(data_set[i + 1,0] - data_set[i,0])
     time_diff = np.array(time_diff)[:, np.newaxis].astype(np.float32)
-    for range_ in range(50000):
+    for range_ in range(10000):
         start = range_ * 2
         seq_name = f'{range_}'
         df_ = data_set[start:start + event_num,:]
