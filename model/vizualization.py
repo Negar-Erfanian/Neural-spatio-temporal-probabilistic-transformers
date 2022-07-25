@@ -115,7 +115,6 @@ def plot_expected_intensity(bij_time, timediff_out, savepath, count):
 
 def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_data, model, curr_path, savepath, count, idx):
     N = 85
-    stacks = []
     plts = 3
     ll = []
     fig = plt.figure(figsize=(18, 8))

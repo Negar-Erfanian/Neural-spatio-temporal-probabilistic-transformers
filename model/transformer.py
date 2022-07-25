@@ -83,7 +83,7 @@ class Transformer(Model):
         # self.bij_loc = RealNVPbij()
         self.bij_loc = RealNVP(num_coupling_layers=6,
                                input_shape=(max_positional_encoding_target, dim_out_loc,),
-                               marker='loc')
+                               dim = dim_out_loc)
 
     def call(self, inputs, outputs, training, look_ahead_mask_in, look_ahead_mask_out):
         scale = 2.

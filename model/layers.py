@@ -271,13 +271,17 @@ class Decoder(Layer):
 
 class RealNVP(Layer):
 
-    def __init__(self, num_coupling_layers, input_shape=(None, 3,), marker='loc'):
+    def __init__(self, num_coupling_layers, input_shape=(None, 3,), dim = 3):
         super(RealNVP, self).__init__()
         self.num_coupling_layers = num_coupling_layers
 
-        if marker == 'loc':
+        if dim == 3:
             self.masks = np.array(
                 [[0, 1, 0], [1, 0, 1]] * (num_coupling_layers // 2), dtype="float32"
+            )
+        elif dim ==2 :
+            self.masks = np.array(
+                [[0, 1], [1, 0]] * (num_coupling_layers // 2), dtype="float32"
             )
         self.layers_list = [Coupling(input_shape=input_shape) for i in range(num_coupling_layers)]
 
