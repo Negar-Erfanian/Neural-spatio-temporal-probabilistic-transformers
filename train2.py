@@ -40,6 +40,7 @@ lr = args.lr
 gpu_num = args.gpu_num
 remove_all = bool(args.remove_all)
 desc = args.desc
+print(f'gpu_num is {gpu_num}')
 
 run_train = args.train
 
@@ -60,7 +61,7 @@ regularizer2 = 0.1
 
 if dataset == 'earthquake':
     dim = 3
-elif dataset in ['covid19', 'citibike']:
+elif dataset in ['covid19', 'citibike', 'pinwheel']:
     dim = 2
 
 all_experiments = 'experiment_results/'
@@ -152,6 +153,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
     @tf.function
     def batch_processing(batch, dataset):
         ds_in, ds_out = batch
+        print(f'{mean.shape}')
         norm = Normalization(mean=mean, variance=std**2)
         ds_time_in, ds_locationmag_in, ds_timediff_in = ds_in[:, :, 0], ds_in[:, :, 1:dim+2], ds_in[:, :, dim+2][..., tf.newaxis]
         ds_locationmag_in = norm(ds_locationmag_in)
@@ -160,6 +162,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             tf.subtract(tf.math.reduce_max(ds_time_in, axis=-1, keepdims=True),
                         tf.math.reduce_min(ds_time_in, axis=-1, keepdims=True))
         )
+
 
         ds_time_out, ds_locationmag_out, ds_timediff_out = ds_out[:, :, 0], ds_out[:, :, 1:dim+2], ds_out[:, :, dim+2][..., tf.newaxis]
         ds_locationmag_out = norm(ds_locationmag_out)
