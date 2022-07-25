@@ -67,15 +67,15 @@ def process_data_earth(filename, event_num, seqs='fixed'):  # 'variable'
                 continue
             time, space, mag, time_diff = \
                 df_.to_numpy().astype(np.float32)[:, 0:1], df_.to_numpy().astype(np.float32)[:, 1:4], df_.to_numpy().astype(np.float32)[:, 4:5], df_.to_numpy().astype(np.float32)[:, 5:6]
-
+            print(f'time[-1]  is {time[-1]}')
             sequences[seq_name] = np.concatenate([time, space, mag, time_diff], axis=1)
 
             length.append(len(sequences[seq_name]))
 
-        print(f'min length is {min(length)}, max length is {max(length)}, average length is {statistics.mean(length)}.')
+        #print(f'min length is {min(length)}, max length is {max(length)}, average length is {statistics.mean(length)}.')
 
-        print(f'in the forward process we have {len(sequences)} files')
-        np.savez('data/earthquakes_calif.npz', **sequences)
+        #print(f'in the forward process we have {len(sequences)} files')
+        #np.savez('earthquakes_calif.npz', **sequences)
 
 
 
@@ -111,7 +111,7 @@ def process_data_earth(filename, event_num, seqs='fixed'):  # 'variable'
         print(f'min length is {min(length)}, max length is {max(length)}, average length is {statistics.mean(length)}.')
 
         print(f'in the forward process we have {len(sequences)} files')
-        np.savez('data/earthquakes_calif.npz', **sequences)
+        #np.savez('data/earthquakes_calif.npz', **sequences)
 
     return mean, std
 

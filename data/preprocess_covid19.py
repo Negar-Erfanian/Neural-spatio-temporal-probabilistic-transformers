@@ -11,7 +11,7 @@ import reverse_geocoder as rg
 def process_data_covid(file_name, event_num=500):
     np.random.seed(0)
 
-    #download_url("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv", "covid19")
+     #download_url("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv", "covid19")
 
     df = pd.read_csv(file_name)
 

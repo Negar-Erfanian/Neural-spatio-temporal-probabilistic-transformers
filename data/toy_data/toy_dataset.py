@@ -3,9 +3,10 @@
 from functools import partial
 import contextlib
 import numpy as np
+import pandas as pd
 
 
-from MHP import MHP
+from data.toy_data.MHP import MHP
 
 END_TIME = 3075.0
 
@@ -76,8 +77,8 @@ def process_data_pinwheel(event_num, num_classes):
         data_fn = partial(pinwheel, num_classes=num_classes)
         data_set = generate(mhp, data_fn, ndim=2, num_classes=num_classes)
     print(data_set[:,-1])
-    mean = np.mean(data_set[:, 1:4], axis=0)
-    std = np.std(data_set[:, 1:4], axis=0)
+    mean = pd.DataFrame(np.mean(data_set[:, 1:4], axis=0).reshape(1,-1))
+    std = pd.DataFrame(np.std(data_set[:, 1:4], axis=0).reshape(1,-1))
     time_diff.append(data_set[0,0])
     for i in range(data_set.shape[0] - 1):
         time_diff.append(data_set[i + 1,0] - data_set[i,0])

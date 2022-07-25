@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from data.preprocess_earthquakes import process_data_earth
 from data.preprocess_citibike import process_data_bike
 from data.preprocess_covid19 import process_data_covid
+from data.toy_data.toy_dataset import process_data_pinwheel
 
 
 def data_loading(event_num, event_out, dataset):
@@ -20,8 +21,12 @@ def data_loading(event_num, event_out, dataset):
         data_path1 = path / 'covid_nj_cases.npz'
         dim = 2
     elif dataset == 'citibike':
-        mean, std = process_data_bike(event_num=500)  # 'variable'
+        mean, std = process_data_bike(event_num=event_num)  # 'variable'
         data_path1 = path / 'citibike.npz'
+        dim = 2
+    elif dataset == 'pinwheel':
+        mean, std = process_data_pinwheel(event_num = event_num, num_classes = 50)  # 'variable'
+        data_path1 = path / 'pinwheel.npz'
         dim = 2
     data = np.load(data_path1)
     files = data.files
@@ -47,6 +52,7 @@ def data_generation(event_num, event_out, dataset, batch_size=64):
     cache_path.mkdir(exist_ok=True)
     if not (cache_path / f'{dataset}_input.npy').is_file():
         dataset_input, dataset_output, ds_NF, mean, std = data_loading(event_num, event_out, dataset)
+        print(f'mean is {mean}')
         np.save(cache_path / f'{dataset}_input.npy', np.stack(dataset_input))
         np.save(cache_path / f'{dataset}_output.npy', np.stack(dataset_output))
         np.save(cache_path / f'{dataset}_ds_nf.npy', np.stack(ds_NF))
