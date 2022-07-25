@@ -48,7 +48,8 @@ def data_loading(event_num, event_out, dataset):
 
 
 def data_generation(event_num, event_out, dataset, batch_size=64):
-    cache_path = Path(__file__).parents[0] / 'cache_dir'
+    dataset_input, dataset_output, ds_NF, mean, std = data_loading(event_num, event_out, dataset)
+    '''cache_path = Path(__file__).parents[0] / 'cache_dir'
     cache_path.mkdir(exist_ok=True)
     if not (cache_path / f'{dataset}_input.npy').is_file():
         dataset_input, dataset_output, ds_NF, mean, std = data_loading(event_num, event_out, dataset)
@@ -62,7 +63,7 @@ def data_generation(event_num, event_out, dataset, batch_size=64):
     dataset_output = np.load(cache_path / f'{dataset}_output.npy')
     ds_NF = np.load(cache_path / f'{dataset}_ds_nf.npy')
     mean = pd.read_pickle(cache_path / f'{dataset}_mean.csv')
-    std = pd.read_pickle(cache_path / f'{dataset}_std.csv')
+    std = pd.read_pickle(cache_path / f'{dataset}_std.csv')'''
 
     dataset_ = tf.data.Dataset.from_tensor_slices((dataset_input, dataset_output))
     dataset_NF = tf.data.Dataset.from_tensor_slices(ds_NF)

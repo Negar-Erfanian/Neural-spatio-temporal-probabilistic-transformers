@@ -24,8 +24,11 @@ def process_data_covid(file_name, event_num=500):
     df_county_geoloc["Area"] = df_county_geoloc["Total Areakm²"]
     df_county_geoloc = df_county_geoloc[["FIPS", "Longitude", "Latitude", "Area"]]
 
-    df_county_geoloc.Latitude = df_county_geoloc.Latitude.map(lambda s: float(s.replace("?", "-").replace("°", "")))
-    df_county_geoloc.Longitude = df_county_geoloc.Longitude.map(lambda s: float(s.replace("?", "-").replace("°", "")))
+
+    df_county_geoloc.Latitude = df_county_geoloc.Latitude.map(lambda s: float(s.replace("°", "")))
+
+    df_county_geoloc.Longitude = df_county_geoloc.Longitude.map(lambda s: -float(s.replace("°", "")[1:]))
+
     df_county_geoloc.FIPS = df_county_geoloc.FIPS.map(lambda x: float(x))
     df = df.merge(df_county_geoloc, left_on="fips", right_on="FIPS", how="left")
 
@@ -63,9 +66,9 @@ def process_data_covid(file_name, event_num=500):
     # Create numeric time column.
     df["day"] = df["date"].apply(lambda x: float((x - start_date).days))
 
-    time_diff.append(df["day"][0])
+    time_diff.append(np.array(df["day"].iloc[0]))
     for i in range(df.shape[0] - 1):
-        time_diff.append(df["day"][i + 1] - df["day"][i])
+        time_diff.append(np.array(df["day"].iloc[i + 1]) - np.array(df["day"].iloc[i]))
 
     df["Time_diff"] = time_diff
     # Cases in New Jersey.
@@ -87,7 +90,7 @@ def process_data_covid(file_name, event_num=500):
             continue
 
         seq = df_.to_numpy()[:, :5].astype(np.float64)
-        print(f'seq is {seq}')
+        #print(f'seq is {seq}')
         #counties = df_.to_numpy()[:, -1]
 
         t, x, cases, time_diff  = seq[:, 0:1], seq[:, 1:3], seq[:, 3:4], seq[:, 4:5]
