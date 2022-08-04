@@ -23,7 +23,7 @@ np_config.enable_numpy_behavior()
 from model.functions import create_look_ahead_mask
 from model.transformer import Transformer
 from model.benchmark_spatiotemporal import Spatiotemporal
-from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_3d_density, plot_expected_3d_density_gmm
+from model.vizualization import plot_expectedtime, plot_expected_intensity, plot_expected_3d_density, plot_expected_3d_density_gmm, plot_expected_2d_density, plot_expected_2d_density_gmm
 from data.load_data import data_generation
 
 from utils import *
@@ -114,8 +114,11 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
         gc.collect()
 
     time_vector = np.zeros([num_epochs, 1])  # time per epoch
-
-    optimizer = tf.keras.optimizers.Adam()  # learning_rate = lr
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate=lr,
+        decay_steps=10000,
+        decay_rate=0.9)
+    optimizer = tf.keras.optimizers.Adam(learning_rate = lr_schedule)  # learning_rate = lr
     train_losses = []
     valid_losses = []
 
@@ -153,7 +156,6 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
     @tf.function
     def batch_processing(batch, dataset):
         ds_in, ds_out = batch
-        print(f'{mean.shape}')
         norm = Normalization(mean=mean, variance=std**2)
         ds_time_in, ds_locationmag_in, ds_timediff_in = ds_in[:, :, 0], ds_in[:, :, 1:dim+2], ds_in[:, :, dim+2][..., tf.newaxis]
         ds_locationmag_in = norm(ds_locationmag_in)
@@ -194,10 +196,14 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
         train_log_dir = os.path.join(exp_path, 'logs', 'train')
         train_summary_writer = tf.summary.create_file_writer(train_log_dir)
         train_loss_metric = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+        train_loss_metric_time = tf.keras.metrics.Mean('train_loss_time', dtype=tf.float32)
+        train_loss_metric_space = tf.keras.metrics.Mean('train_loss_space', dtype=tf.float32)
 
         val_log_dir = os.path.join(exp_path, 'logs', 'val')
         val_summary_writer = tf.summary.create_file_writer(val_log_dir)
         val_loss_metric = tf.keras.metrics.Mean('val_loss', dtype=tf.float32)
+        val_loss_metric_time = tf.keras.metrics.Mean('val_loss_time', dtype=tf.float32)
+        val_loss_metric_space = tf.keras.metrics.Mean('val_loss_space', dtype=tf.float32)
 
         for epoch in range(num_epochs):
             epoch_start = time.time()
@@ -209,22 +215,26 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     batch_processing(train_batch, dataset)
 
                 train_ds_time_out, train_ds_loc_out, train_ds_mag_out, train_ds_timediff_out = train_ds_out_stack
-
                 if model_type == 'transformer':
                     with tf.GradientTape() as tape:
                         dec_dist_out_time, ds_out_pred_time, bij_time, dec_dist_out_loc, ds_out_pred_loc, bij_loc, att_weights_dec, att_weights_enc = \
                             model(train_ds_in_stack, train_ds_out_stack, True, train_ds_in_lookaheadmask, train_ds_out_lookaheadmask)
                         tape.watch(model.trainable_variables)
-                        loss = - tf.reduce_mean(bij_time.log_prob(train_ds_timediff_out)) - tf.reduce_mean(bij_loc)
+                        loss_time = - tf.reduce_mean(bij_time.log_prob(train_ds_timediff_out))
+                        loss_space = - tf.reduce_mean(bij_loc)
+                        loss = loss_time + loss_space
                         # +regularizer1*tf.norm(tf.math.subtract(train_ds_timediff_out,ds_out_pred_time), ord=1)+ regularizer2*tf.norm(tf.math.subtract(train_ds_loc_out,ds_out_pred_loc), ord=2)
                         grads = tape.gradient(loss, model.trainable_variables)
                 else:
                     with tf.GradientTape() as tape:
-                        loss, train_expected_times = model(train_ds_in_stack, train_ds_out_stack)
+                        loss_time, loss_space, train_expected_times = model(train_ds_in_stack, train_ds_out_stack)
+                        loss = loss_time + loss_space
                         tape.watch(model.trainable_variables)
                         grads = tape.gradient(loss, model.trainable_variables)
 
                 train_loss_metric.update_state(loss)
+                train_loss_metric_time.update_state(loss_time)
+                train_loss_metric_space.update_state(loss_space)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             train_losses.append(train_loss_metric.result().numpy())
@@ -242,30 +252,42 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     val_ds_in_stack, val_ds_out_stack, val_mask_in, val_mask_out = batch_processing(val_batch, dataset)
 
                     val_ds_time_out, val_ds_loc_out, _, val_ds_timediff_out = val_ds_out_stack
+
                     val_ds_in_lookaheadmask = val_mask_in
                     val_ds_out_lookaheadmask = val_mask_out
                     if model_type =='transformer':
                         val_dec_dist_time, val_ds_out_pred_time, val_bij_time, val_dec_dist_loc, val_ds_out_pred_loc, val_bij_loc, val_att_weights_dec_time, val_att_weights_enc = \
                             model(val_ds_in_stack, val_ds_out_stack, False, val_ds_in_lookaheadmask, val_ds_out_lookaheadmask)
-                        loss_val = -tf.reduce_mean(val_bij_time.log_prob(val_ds_timediff_out)) - tf.reduce_mean(val_bij_loc)
+                        loss_val_time = -tf.reduce_mean(val_bij_time.log_prob(val_ds_timediff_out))
+                        loss_val_space = - tf.reduce_mean(val_bij_loc)
+                        loss_val = loss_val_time +loss_val_space
+                        print(f'we have time prediction outputs and true outputs in validation as {val_ds_out_pred_time[0]} and {val_ds_timediff_out[0]}')
 
 
                     else:
-                        loss_val, val_expected_times = model(val_ds_in_stack, val_ds_out_stack)
+                        loss_val_time, loss_val_space, val_expected_times = model(val_ds_in_stack, val_ds_out_stack)
+                        loss_val = loss_val_time + loss_val_space
                         print(f'we have time prediction outputs and true outputs as {val_expected_times[:, 0]} and {val_ds_time_out[0]}')
 
                     val_loss_metric(loss_val)
-                    #print(f'we have time prediction outputs and true outputs in validation as {val_ds_out_pred_time[0]} and {val_ds_timediff_out[0]}')
+                    val_loss_metric_time(loss_val_time)
+                    val_loss_metric_space(loss_val_space)
                     #print(f'we have loc prediction outputs and true outputs in validation as {val_ds_out_pred_loc[0, :, 0]} and {val_ds_loc_out[0, :, 0]}')
                     #print('val loss is', val_loss_metric.result().numpy())
                 valid_losses.append(val_loss_metric.result().numpy())
                 with val_summary_writer.as_default():
                     tf.summary.scalar(
                         'val', val_loss_metric.result(), step=epoch)
+                    tf.summary.scalar(
+                        'val_time', val_loss_metric_time.result(), step=epoch)
+                    tf.summary.scalar(
+                        'val_space', val_loss_metric_space.result(), step=epoch)
 
-                print("Epoch {:03d}: val: {:.3f}  ".format(epoch, val_loss_metric.result().numpy()))
+                print("Epoch {:03d}: validation_loss: {:.3f}| validation_loss_time: {:.3f}| validation_loss_space: {:.3f}".format(epoch, val_loss_metric.result().numpy(), val_loss_metric_time.result().numpy(), val_loss_metric_space.result().numpy()))
 
                 val_loss_metric.reset_states()
+                val_loss_metric_time.reset_states()
+                val_loss_metric_space.reset_states()
 
                 for i in range(15):
                     gc.collect()
@@ -274,10 +296,16 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             with train_summary_writer.as_default():
                 tf.summary.scalar(
                     'train', train_loss_metric.result(), step=epoch)
+                tf.summary.scalar(
+                    'train_time', train_loss_metric_time.result(), step=epoch)
+                tf.summary.scalar(
+                    'train_space', train_loss_metric_space.result(), step=epoch)
 
-            print("Epoch {:03d}: train: {:.3f}  ".format(epoch, train_loss_metric.result().numpy()))
+            print("Epoch {:03d}: train_loss: {:.3f}| train_loss_time: {:.3f}| train_loss_space: {:.3f} ".format(epoch, train_loss_metric.result().numpy(), train_loss_metric_time.result().numpy(), train_loss_metric_space.result().numpy()))
 
             train_loss_metric.reset_states()
+            train_loss_metric_time.reset_states()
+            train_loss_metric_space.reset_states()
 
             save_path = manager.save()
             print("Saved checkpoint for epoch {}: {}".format(epoch, save_path))
@@ -294,6 +322,8 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
         test_log_dir = os.path.join(exp_path, 'logs', 'test')
         test_summary_writer = tf.summary.create_file_writer(test_log_dir)
         test_loss_metric = tf.keras.metrics.Mean('test_loss', dtype=tf.float32)
+        test_loss_metric_time = tf.keras.metrics.Mean('test_loss_time', dtype=tf.float32)
+        test_loss_metric_space = tf.keras.metrics.Mean('test_loss_space', dtype=tf.float32)
 
         print(f'we are in test now and model is {model}')
         count = 0
@@ -308,24 +338,66 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 test_batch, dataset)
             test_ds_time_in, test_ds_loc_in, test_ds_mag_in, test_ds_timediff_in = test_ds_in_stack
             test_ds_time_out, test_ds_loc_out, test_ds_mag_out, test_ds_timediff_out = test_ds_out_stack
+            aux_state_in  = test_ds_time_in
+            #tf.concat([test_ds_mag_in, test_ds_mag_out[:,0,:][..., tf.newaxis]], axis = 1)
+            aux_state_out = test_ds_time_out
             if model_type =='transformer':
                 test_dec_dist_time, test_ds_out_pred_time, test_bij_time, test_dec_dist_loc, test_ds_out_pred_loc, test_bij_loc, test_att_weights_dec_time, test_att_weights_enc = model(
                     test_ds_in_stack, test_ds_out_stack, False, test_ds_in_lookaheadmask, test_ds_out_lookaheadmask)
+                loss_test_time = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out))
+                loss_test_space = -tf.reduce_mean(test_bij_loc)
+                loss_test = loss_test_time +loss_test_space # +regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
+                '''experiments_figs_scores = exp_path +'/figures_train_scores/'
+                if os.path.exists(experiments_figs_scores) == False:
+                    os.mkdir(experiments_figs_scores)
+                plot_att_scores(test_att_weights_dec_time, savepath = experiments_figs_scores, count = count, mag = mag)'''
 
-                loss_test = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out)) + \
-                            -tf.reduce_mean(test_bij_loc) # +regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
+                '''experiments_figs_time = exp_path + '/time_pred/'
+                if os.path.exists(experiments_figs_time) == False:
+                    os.mkdir(experiments_figs_time)
+                plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_ds_out_pred_time, test_bij_time,
+                                  event_num, savepath=experiments_figs_time, count=count)
+
+                experiments_figs_timeintensity = exp_path + '/time_intensity_pred/'
+                if os.path.exists(experiments_figs_timeintensity) == False:
+                    os.mkdir(experiments_figs_timeintensity)
+                plot_expected_intensity(test_bij_time, test_ds_timediff_out, savepath=experiments_figs_timeintensity,
+                                        count=count)'''
+
+                curr_path = os.getcwd()
+                experiments_figs_loc = exp_path + '/loc_pred/'
+                if os.path.exists(experiments_figs_loc) == False:
+                    os.mkdir(experiments_figs_loc)
+
+                idx = -1
+                if dim ==2:
+                    plot_expected_2d_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx], model=model,
+                                            curr_path=curr_path, dec_dist_loc=test_dec_dist_loc, savepath=experiments_figs_loc,
+                                            count=count, idx=idx)
+                else:
+                    plot_expected_3d_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx],
+                                             model=model,
+                                             curr_path=curr_path, dec_dist_loc=test_dec_dist_loc,
+                                             savepath=experiments_figs_loc,
+                                             count=count, idx=idx)
             else:
-                loss_test, test_expected_times = model(test_ds_in_stack, test_ds_out_stack)
+                loss_test_time, loss_test_space, test_expected_times = model(test_ds_in_stack, test_ds_out_stack)
+                loss_test = loss_test_time + loss_test_space
                 print(f'we have time prediction outputs and true outputs as {test_expected_times[:, 0]} and {test_ds_time_out[0]}')
                 idx = -1
                 curr_path = os.getcwd()
                 experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
                 if os.path.exists(experiments_figs_loc_gmm) == False:
                     os.mkdir(experiments_figs_loc_gmm)
-                plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                if dim == 2:
+                    plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                else:
+                    plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
 
 
             test_loss_metric(loss_test)
+            test_loss_metric_time(loss_test_time)
+            test_loss_metric_space(loss_test_space)
 
             #print(f'we have time prediction outputs and true outputs in test as {test_ds_out_pred_time[0]} and {test_ds_timediff_out[0]}')
             #print(f'we have loc prediction outputs and true outputs in test as {test_ds_out_pred_loc[0, :, 0]} and {test_ds_loc_out[0, :, 0]}')
@@ -334,42 +406,19 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             with test_summary_writer.as_default():
                 tf.summary.scalar(
                     'test', test_loss_metric.result(), step=count)
+                tf.summary.scalar(
+                    'test_time', test_loss_metric_time.result(), step=count)
+                tf.summary.scalar(
+                    'test_loc', test_loss_metric_space.result(), step=count)
 
-            print("Count {:03d}: test: {:.3f}  ".format(count, test_loss_metric.result().numpy()))
+            print("Count {:03d}: test_loss: {:.3f}| test_loss_time: {:.3f}| test_loss_space: {:.3f}  ".format(count, test_loss_metric.result().numpy(), test_loss_metric_time.result().numpy(), test_loss_metric_space.result().numpy()))
 
             test_loss_metric.reset_states()
 
             for i in range(15):
                 gc.collect()
 
-            print(f'-----------------')
-            '''experiments_figs_scores = exp_path +'/figures_train_scores/'
-            if os.path.exists(experiments_figs_scores) == False:
-                os.mkdir(experiments_figs_scores)
-            plot_att_scores(test_att_weights_dec_time, savepath = experiments_figs_scores, count = count, mag = mag)'''
 
-            '''experiments_figs_time = exp_path + '/time_pred/'
-            if os.path.exists(experiments_figs_time) == False:
-                os.mkdir(experiments_figs_time)
-            plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_ds_out_pred_time, test_bij_time,
-                              event_num, savepath=experiments_figs_time, count=count)
-
-            experiments_figs_timeintensity = exp_path + '/time_intensity_pred/'
-            if os.path.exists(experiments_figs_timeintensity) == False:
-                os.mkdir(experiments_figs_timeintensity)
-            plot_expected_intensity(test_bij_time, test_ds_timediff_out, savepath=experiments_figs_timeintensity,
-                                    count=count)
-
-            curr_path = os.getcwd()
-            experiments_figs_loc = exp_path + '/loc_pred/'
-            if os.path.exists(experiments_figs_loc) == False:
-                os.mkdir(experiments_figs_loc)
-
-            idx = -1
-
-            plot_expected_3d_density(history_data=test_ds_loc_in[idx], expected_data=test_ds_loc_out[idx], model=model,
-                                  curr_path=curr_path, dec_dist_loc=test_dec_dist_loc, savepath=experiments_figs_loc,
-                                  count=count, idx=idx)'''
 
             #####################
 

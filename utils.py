@@ -4,11 +4,11 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--num-epochs', type=int, default=1000, help='number of epochs to train for')
+    parser.add_argument('--num-epochs', type=int, default=100, help='number of epochs to train for')
     parser.add_argument('--batch-size', type=int, default=32, help='batch_size')
-    parser.add_argument('--dataset', type=str, default='covid19', help='which dataset to work with') #earthquake #'covid19' #'citibike'
-    parser.add_argument('--model-type', type=str, default='transformer', help='which model to work with') #'benchmark', 'transformer', 'benchmark'
-    parser.add_argument('--temporal-model', type=str, default='Hawkesppp', help='which temporal model to work with as benchmark')  #'Homoppp', 'Hawkesppp','Selfppp'
+    parser.add_argument('--dataset', type=str, default='citibike', help='which dataset to work with') #earthquake #'covid19' #'citibike'
+    parser.add_argument('--model-type', type=str, default='benchmark', help='which model to work with') #'benchmark', 'transformer', 'benchmark'
+    parser.add_argument('--temporal-model', type=str, default='Homoppp', help='which temporal model to work with as benchmark')  #'Homoppp', 'Hawkesppp','Selfppp'
     parser.add_argument('--spatial-model', type=str, default='gmm', help='which spatial model to work with as benchmark') #'gmm', 'cond_gmm'
     parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
     parser.add_argument('--num-layers', type=int, default=6, help='number of layers of the encoder and decoder in the transformer architecture')
@@ -23,7 +23,7 @@ def get_args():
     parser.add_argument('--remove-all', type=int, default=0, help='Remove the previous experiment')
     parser.add_argument('--seed', type=int, default=0, help='Have reproducible results')
     parser.add_argument('--event_num', type=int, default=500, help='Number of events in each sequence')
-    parser.add_argument('--event_out', type=int, default=6, help='Number of events to predict')
+    parser.add_argument('--event_out', type=int, default=3, help='Number of events to predict')
     parser.add_argument('--desc', type=str, default='Default', help='add a small descriptor to folder name')
     parser.add_argument('--train', default=True, action='store_true')
     parser.add_argument('--notrain', dest='train', action='store_false')
