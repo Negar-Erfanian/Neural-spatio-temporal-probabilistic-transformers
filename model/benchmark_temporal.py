@@ -37,7 +37,7 @@ class HomogeneousPoissonPointProcess(tf.keras.Model):
         initial = tf.broadcast_to([0.], [output_time.shape[0]])[..., tf.newaxis]
         for i in range(num_output):
             t_range = tf.linspace(initial[:, -1], output_time[:, -1], 1000, axis=-1)
-            predicted = tf.reduce_sum(t_range * lamb, -1)
+            predicted = tf.reduce_mean(t_range * lamb, -1)
 
             expected.append(predicted)
             initial = tf.concat([initial, predicted[..., tf.newaxis]], -1)
@@ -75,12 +75,12 @@ class HawkesPointProcess(tf.keras.Model):
         dt = fill_triu(-dt * beta, -1e20)
         # print(f'dt is {dt[0]}')
         lamb = tf.nn.softplus(tf.math.exp(tf.math.reduce_logsumexp(dt, axis=-1)) * alpha * beta) + mu # (N, T)
-        lamb = tf.divide(
-            tf.subtract(lamb, tf.math.reduce_min(lamb, axis=-1, keepdims=True)),
-            tf.subtract(tf.math.reduce_max(lamb, axis=-1, keepdims=True),
-                        tf.math.reduce_min(lamb, axis=-1, keepdims=True))
-        )
-        loglik = tf.reduce_sum(tf.math.log(lamb + 1e-8), -1)  # (N,)
+        #lamb = tf.divide(
+        #    tf.subtract(lamb, tf.math.reduce_min(lamb, axis=-1, keepdims=True)),
+        #    tf.subtract(tf.math.reduce_max(lamb, axis=-1, keepdims=True),
+         #               tf.math.reduce_min(lamb, axis=-1, keepdims=True))
+        #)
+        loglik = tf.reduce_mean(tf.math.log(lamb + 1e-8), -1)  # (N,)
         log_kernel = -beta * (input_time[:, -1][...,tf.newaxis] - input_time) # (N,T)
 
         compensator = (input_time[:, -1] - input_time[:, 0]) * mu
@@ -139,14 +139,29 @@ class SelfCorrectingPointProcess(tf.keras.Model):
 
     def predict(self, input_time, output_time):
 
-        _, lamb = self.call(input_time)
+        #_, lamb = self.call(input_time)
         num_output = output_time.shape[1]
         output_time = tf.squeeze(output_time, -1)
         expected = []
         initial = tf.broadcast_to([0.], [output_time.shape[0]])[..., tf.newaxis]
         for i in range(num_output):
             t_range = tf.linspace(initial[:, -1], output_time[:, -1], 1000, axis=-1)
-            predicted = tf.reduce_sum(t_range * lamb, -1)
+            N, T = t_range.shape
+            input_time = tf.reshape(t_range, (N, T))
+            mu = tf.nn.softplus(self.mu)
+            beta = tf.nn.softplus(self.beta)
+
+            betaN = beta * tf.cast(tf.broadcast_to(tf.experimental.numpy.arange(T).reshape(1, T), (N, T)),
+                                   beta.dtype)  # (N, T)
+
+            loglik = mu * input_time - betaN  # (N, T)
+            lamb = tf.math.exp(loglik)
+            lamb = tf.divide(
+                tf.subtract(lamb, tf.math.reduce_min(lamb, axis=-1, keepdims=True)),
+                tf.subtract(tf.math.reduce_max(lamb, axis=-1, keepdims=True),
+                            tf.math.reduce_min(lamb, axis=-1, keepdims=True))
+            )
+            predicted = tf.reduce_mean(t_range * lamb, -1)
             expected.append(predicted)
             initial = tf.concat([initial, predicted[..., tf.newaxis]], -1)
         expected = tf.convert_to_tensor(expected)
@@ -172,6 +187,6 @@ def predict_hawkes(t_range, beta, alpha, mu):
         tf.subtract(tf.math.reduce_max(lamb, axis=-1, keepdims=True),
                     tf.math.reduce_min(lamb, axis=-1, keepdims=True))
     )
-    exptected_time = tf.reduce_sum(tf.math.multiply(t_range, lamb), -1)
+    exptected_time = tf.reduce_mean(tf.math.multiply(t_range, lamb), -1)
 
     return exptected_time

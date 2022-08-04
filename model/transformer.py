@@ -29,7 +29,7 @@ class Transformer(Model):
     def __init__(self, num_layers, embedding_dim_enc, embedding_dim_dec, num_heads, fc_dim,
                  dim_out_time, dim_out_loc, max_positional_encoding_input,
                  max_positional_encoding_target, time_layer_prob,
-                 dropout_rate=0.1, layernorm_eps=1e-6):
+                 dropout_rate=0.3, layernorm_eps=1e-6):
         super(Transformer, self).__init__()
 
         self.fc_dim = fc_dim
