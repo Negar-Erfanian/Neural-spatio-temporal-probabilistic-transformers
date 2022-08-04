@@ -5,7 +5,7 @@ import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 
 from data.preprocess_earthquakes import process_data_earth
-from data.preprocess_citibike import process_data_bike
+from data.preprocess_citibike import process_data_bike, download
 from data.preprocess_covid19 import process_data_covid
 from data.toy_data.toy_dataset import process_data_pinwheel
 
@@ -25,7 +25,7 @@ def data_loading(event_num, event_out, dataset):
         data_path1 = path / 'citibike.npz'
         dim = 2
     elif dataset == 'pinwheel':
-        mean, std = process_data_pinwheel(event_num = event_num, num_classes = 50)  # 'variable'
+        mean, std = process_data_pinwheel(event_num = event_num, num_classes = 10)  # 'variable'
         data_path1 = path / 'pinwheel.npz'
         dim = 2
     data = np.load(data_path1)
@@ -49,11 +49,10 @@ def data_loading(event_num, event_out, dataset):
 
 def data_generation(event_num, event_out, dataset, batch_size=64):
     dataset_input, dataset_output, ds_NF, mean, std = data_loading(event_num, event_out, dataset)
-    '''cache_path = Path(__file__).parents[0] / 'cache_dir'
+    cache_path = Path(__file__).parents[0] / 'cache_dir'
     cache_path.mkdir(exist_ok=True)
     if not (cache_path / f'{dataset}_input.npy').is_file():
         dataset_input, dataset_output, ds_NF, mean, std = data_loading(event_num, event_out, dataset)
-        print(f'mean is {mean}')
         np.save(cache_path / f'{dataset}_input.npy', np.stack(dataset_input))
         np.save(cache_path / f'{dataset}_output.npy', np.stack(dataset_output))
         np.save(cache_path / f'{dataset}_ds_nf.npy', np.stack(ds_NF))
@@ -63,7 +62,7 @@ def data_generation(event_num, event_out, dataset, batch_size=64):
     dataset_output = np.load(cache_path / f'{dataset}_output.npy')
     ds_NF = np.load(cache_path / f'{dataset}_ds_nf.npy')
     mean = pd.read_pickle(cache_path / f'{dataset}_mean.csv')
-    std = pd.read_pickle(cache_path / f'{dataset}_std.csv')'''
+    std = pd.read_pickle(cache_path / f'{dataset}_std.csv')
 
     dataset_ = tf.data.Dataset.from_tensor_slices((dataset_input, dataset_output))
     dataset_NF = tf.data.Dataset.from_tensor_slices(ds_NF)

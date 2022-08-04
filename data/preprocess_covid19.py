@@ -65,23 +65,34 @@ def process_data_covid(file_name, event_num=500):
     time_diff = []
     # Create numeric time column.
     df["day"] = df["date"].apply(lambda x: float((x - start_date).days))
+    df["day"] = add_temporal_noise(df["day"])
+    df = df.sort_values(by=["day"])
+    df.reset_index(inplace=True)
+
+
+
 
     time_diff.append(np.array(df["day"].iloc[0]))
     for i in range(df.shape[0] - 1):
         time_diff.append(np.array(df["day"].iloc[i + 1]) - np.array(df["day"].iloc[i]))
-
+    #print(f'time diff is {time_diff}')
     df["Time_diff"] = time_diff
     # Cases in New Jersey.
-    df = df[["day", "Longitude", "Latitude", "Time_diff", "Area", "new_cases", "state", "county"]]
+    df = df[["day", "Longitude", "Latitude","new_cases", "Time_diff", "Area", "state", "county"]]
     df = df[df.new_cases > 0]
-    df = df.loc[df.index.repeat(df.new_cases)]
+    #df = df.loc[df.index.repeat(df.new_cases)]
     df = df[df.state == "New Jersey"]
 
+    # Assume each degree of longitude/latitude is ~110km.
+    '''degrees = np.sqrt(df["Area"].to_numpy().astype(np.float32)) / 110.0
+    space = df.to_numpy()[:, 1:3].astype(np.float32)
+    space = add_unif_spatial_noise(space, degrees.reshape(-1, 1), df["county"].to_numpy())
+    df[["Longitude", "Latitude"]] = pd.DataFrame(space)'''
     mean = np.mean(df[["Longitude", "Latitude", "new_cases"]], axis=0)
     std = np.std(df[["Longitude", "Latitude", "new_cases"]], axis=0)
 
     sequences = {}
-    for range_ in range(5000):
+    for range_ in range(2000):
         start = range_ * 2
         seq_name = f'{range_}'
         df_ = df.iloc[start:start + event_num]
@@ -89,14 +100,15 @@ def process_data_covid(file_name, event_num=500):
             print('we are skipping becuz of length', seq_name)
             continue
 
-        seq = df_.to_numpy()[:, :5].astype(np.float64)
+        seq = df_.to_numpy()[:, :6].astype(np.float32)
         #print(f'seq is {seq}')
         #counties = df_.to_numpy()[:, -1]
 
         t, x, cases, time_diff  = seq[:, 0:1], seq[:, 1:3], seq[:, 3:4], seq[:, 4:5]
-        #area = seq[:, 3]
 
-        print(seq_name, seq.shape[0])
+
+
+        #print(seq_name, seq.shape[0])
         sequences[seq_name] = np.concatenate([t, x, cases, time_diff], axis=1)
 
         '''for i in tqdm(range(50)):
