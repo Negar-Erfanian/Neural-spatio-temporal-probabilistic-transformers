@@ -83,7 +83,7 @@ def process_data_pinwheel(event_num, num_classes):
     for i in range(data_set.shape[0] - 1):
         time_diff.append(data_set[i + 1,0] - data_set[i,0])
     time_diff = np.array(time_diff)[:, np.newaxis].astype(np.float32)
-    for range_ in range(10000):
+    for range_ in range(1000):
         start = range_ * 2
         seq_name = f'{range_}'
         df_ = data_set[start:start + event_num,:]
