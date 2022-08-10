@@ -114,22 +114,21 @@ def plot_expected_intensity(bij_time, timediff_out, savepath, count):
     plt.close()
 
 def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, curr_path, savepath, count, idx):
-    N = 20
+    N = 60
     plts =  expected_data.shape[1]
-    ll = []
     fig = plt.figure(figsize=(18, 8))
     im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))
 
     for i in range(plts):
-        current_time = curr_time[i]
-        expected_loc = expected_data[:,i,:]
+        current_time = curr_time[:,i]
+        expected_loc = expected_data[:,i,:][:, tf.newaxis,:]
         aux_state = tf.concat([aux_state_in, aux_state_out[:, i, :][..., tf.newaxis]], axis=1)
 
         #print(f'expected_loc shape is {int(expected_loc[0, 2])}')
-        normalized_data = np.concatenate([history_data, expected_loc], axis=0)
-        minx, maxx = tf.math.reduce_min(normalized_data[:, 0]), tf.math.reduce_max(normalized_data[:, 0])
-        miny, maxy = tf.math.reduce_min(normalized_data[:, 1]), tf.math.reduce_max(normalized_data[:, 1])
-        minz, maxz = tf.math.reduce_min(normalized_data[:, 2]), tf.math.reduce_max(normalized_data[:, 2])
+        normalized_data = np.concatenate([history_data, expected_loc], axis=1)
+        minx, maxx = tf.math.reduce_min(normalized_data[:,:, 0]), tf.math.reduce_max(normalized_data[:,:, 0])
+        miny, maxy = tf.math.reduce_min(normalized_data[:,:, 1]), tf.math.reduce_max(normalized_data[:,:, 1])
+        minz, maxz = tf.math.reduce_min(normalized_data[:,:, 2]), tf.math.reduce_max(normalized_data[:,:, 2])
 
         xlim = np.linspace(minx, maxx, N)
         ylim = np.linspace(miny, maxy, N)
@@ -137,44 +136,43 @@ def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_d
 
         X1, X2, X3 = np.meshgrid(xlim, ylim, zlim)
         arr = np.stack([X1.reshape(-1), X2.reshape(-1), X3.reshape(-1)], axis=1)
-        loglikelihood_fn = model.spatial_model.spatial_conditional_logprob_fn(current_time, input_time, history_data, aux_state=aux_state)
+        arr = tf.broadcast_to(arr[None], (expected_data.shape[0], *arr.shape))
+        arr = arr.reshape(-1, arr.shape[-1])
+        loglikelihood_fn = model.spatial_model.spatial_conditional_logprob_fn(current_time[...,None], input_time[...,None], history_data, aux_state=aux_state)
         loglikelihood = loglikelihood_fn(arr)
         norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
-
-        predicted = tf.reduce_mean(arr*norm_loglik[...,tf.newaxis],0)
-        print(f'predicted is {predicted}')
+        predicted = tf.reduce_max((arr*norm_loglik[...,tf.newaxis]).reshape(expected_data.shape[0], N*N*N, -1),1)  #(batch,d)
         loglikelihood = loglikelihood.reshape(N, N, N)
 
 
         ax = fig.add_subplot(2, plts, i+1)
         # plot background
-        ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
-                              np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
-        print(f'expected_data[i,2] is {expected_data.shape}')
+        ax.imshow(im, extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
+                              np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
         ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])] * 100, levels=800, alpha=0.7, cmap='RdGy')
-        #ax.scatter(predicted[0], predicted[1], marker='*', color='blue', s=150)
-        ax.scatter(history_data[-10:, 0], history_data[-10:, 1], marker='*', color='black', s=70)
-        ax.scatter(expected_loc[0,0], expected_loc[0,1], marker='o', color='green', s=100)
+        ax.scatter(predicted[0, 0], predicted[0, 1], marker='*', color='red', s=250)
+        ax.scatter(history_data[0,-10:, 0], history_data[0,-10:, 1], marker='*', color='black', s=70)
+        ax.scatter(expected_loc[0,0, 0], expected_loc[0,0, 1], marker='o', color='green', s=100)
 
 
         ax = fig.add_subplot(2, plts, i+4, projection='3d')
         ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, -1], levels=800, alpha=0.7, cmap='RdGy',
                     zdir='z', offset=zlim[-1])
-        ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, int(expected_loc[0, 2])] * 1000,
-                    levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=expected_loc[0, 2])
+        ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, int(expected_loc[0,0, 2])] * 1000,
+                    levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=expected_loc[0,0, 2])
         ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:, :, 0], levels=800, alpha=0.7, cmap='RdGy',
                     zdir='z', offset=zlim[0])
-        #ax.scatter3D(predicted[0], predicted[1], predicted[2], marker='*', color='blue', s=280)
-        ax.scatter3D(history_data[-10:, 0], history_data[-10:, 1], history_data[-10:, 2], marker='*', color='black',
+        ax.scatter3D(predicted[0, 0], predicted[0, 1], predicted[0, 2], marker='*', color='red', s=380)
+        ax.scatter3D(history_data[0,-10:, 0], history_data[0,-10:, 1], history_data[0, -10:, 2], marker='*', color='black',
                      s=150)
-        ax.scatter3D(expected_loc[0, 0], expected_loc[0, 1], expected_loc[0, 2], marker='o',
+        ax.scatter3D(expected_loc[0,0, 0], expected_loc[0,0, 1], expected_loc[0,0, 2], marker='o',
                      color='green', s=400)
         ax.set_zlim(minz, maxz)
         ax.view_init(+25, -140)
 
         fig.tight_layout()
-        history_data = np.concatenate([history_data, predicted[tf.newaxis, ...]], axis=0)
-        input_time = np.concatenate([input_time, current_time[None]], axis=0)
+        history_data = np.concatenate([history_data, predicted[tf.newaxis, ...]], axis=1)
+        input_time = np.concatenate([input_time, current_time[None]], axis=1)
         aux_state_in = aux_state
     # fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)
     plt.savefig(f'{savepath}/test_batch{count}_{idx}.png')
@@ -182,48 +180,51 @@ def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_d
     plt.close()
 
 def plot_expected_2d_density_gmm(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, curr_path, savepath, count, idx):
-    N = 85
+    N = 80
     plts =  expected_data.shape[1]
     ll = []
     fig = plt.figure(figsize=(18, 8))
     #im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))
     for i in range(plts):
-        current_time = curr_time[i]
-        expected_loc = expected_data[:,i,:]
+        current_time = curr_time[:,i]
+        expected_loc = expected_data[:,i,:][:, tf.newaxis,:]
         aux_state = tf.concat([aux_state_in, aux_state_out[:, i, :][..., tf.newaxis]], axis=1)
-        #print(f'expected_loc shape is {int(expected_loc[0, 2])}')
-        normalized_data = np.concatenate([history_data, expected_loc], axis=0)
-        minx, maxx = tf.math.reduce_min(normalized_data[:, 0]), tf.math.reduce_max(normalized_data[:, 0])
-        miny, maxy = tf.math.reduce_min(normalized_data[:, 1]), tf.math.reduce_max(normalized_data[:, 1])
+        normalized_data = np.concatenate([history_data, expected_loc], axis=1)
+        minx, maxx = tf.math.reduce_min(normalized_data[:,:, 0]), tf.math.reduce_max(normalized_data[:,:, 0])
+        miny, maxy = tf.math.reduce_min(normalized_data[:,:, 1]), tf.math.reduce_max(normalized_data[:,:, 1])
 
         xlim = np.linspace(minx, maxx, N)
         ylim = np.linspace(miny, maxy, N)
 
         X1, X2 = np.meshgrid(xlim, ylim)
         arr = np.stack([X1.reshape(-1), X2.reshape(-1) ], axis=1)
-        loglikelihood_fn = model.spatial_model.spatial_conditional_logprob_fn(current_time, input_time, history_data, aux_state)
+        arr = tf.broadcast_to(arr[None], (expected_data.shape[0], *arr.shape))
+        arr = arr.reshape(-1, arr.shape[-1])
+        loglikelihood_fn = model.spatial_model.spatial_conditional_logprob_fn(current_time[..., None],
+                                                                              input_time[..., None], history_data,
+                                                                              aux_state=aux_state)
         loglikelihood = loglikelihood_fn(arr)
         norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
-        predicted = tf.reduce_max(arr*norm_loglik[...,tf.newaxis],0)
+        predicted = tf.reduce_max((arr * norm_loglik[..., tf.newaxis]).reshape(expected_data.shape[0], N * N , -1),1)  # (batch,d)
+
         print(f'predicted is {predicted}')
         loglikelihood = loglikelihood.reshape(N, N)
 
 
-        ax = fig.add_subplot(2, plts, i+1)
+        ax = fig.add_subplot(1, plts, i+1)
         # plot background
         #ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
         #                      np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
-        print(f'expected_data[i,2] is {expected_data.shape}')
         ax.contourf(X1, X2, tf.exp(loglikelihood) * 100, levels=800, alpha=0.7, cmap='RdGy')
-        ax.scatter(predicted[0], predicted[1], marker='*', color='blue', s=150)
-        ax.scatter(history_data[-10:, 0], history_data[-10:, 1], marker='*', color='black', s=70)
-        ax.scatter(expected_loc[0,0], expected_loc[0,1], marker='o', color='green', s=100)
+        ax.scatter(predicted[0,0], predicted[0,1], marker='*', color='blue', s=150)
+        ax.scatter(history_data[0,-10:, 0], history_data[0,-10:, 1], marker='*', color='black', s=70)
+        ax.scatter(expected_loc[0,0,0], expected_loc[0,0,1], marker='o', color='green', s=100)
 
 
 
         fig.tight_layout()
-        history_data = np.concatenate([history_data, predicted[tf.newaxis, ...]], axis=0)
-        input_time = np.concatenate([input_time, current_time[None]], axis=0)
+        history_data = np.concatenate([history_data, predicted[tf.newaxis, ...]], axis=1)
+        input_time = np.concatenate([input_time, current_time[None]], axis=1)
         aux_state_in = aux_state
     # fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)
     plt.savefig(f'{savepath}/test_batch{count}_{idx}.png')
@@ -234,7 +235,7 @@ def plot_expected_2d_density_gmm(curr_time, input_time, history_data, expected_d
 
 def plot_expected_3d_density(history_data, expected_data, model, curr_path, dec_dist_loc, savepath, count, idx):
     N = 85
-    stacks = []
+
     normalized_data = np.concatenate([history_data, expected_data], axis=0)
     minx, maxx = tf.math.reduce_min(normalized_data[:, 0]), tf.math.reduce_max(normalized_data[:, 0])
     miny, maxy = tf.math.reduce_min(normalized_data[:, 1]), tf.math.reduce_max(normalized_data[:, 1])
@@ -251,7 +252,6 @@ def plot_expected_3d_density(history_data, expected_data, model, curr_path, dec_
     #print(f'expected_data shape is {expected_data.shape}')
 
     y, log_likelihood = model.bij_loc(arr2, dec_dist_loc, test=True)
-    print(f'log_likelihood shape is {log_likelihood.shape}')
     log_likelihood = log_likelihood[:, 0, :]
 
     fig = plt.figure(figsize=(18, 8))

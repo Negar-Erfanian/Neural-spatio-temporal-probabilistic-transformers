@@ -15,6 +15,8 @@ tfb = tfp.bijectors
 tfk = tf.keras
 
 from model.functions import get_base_distribution
+initializer = tf.keras.initializers.HeNormal()
+
 
 
 class Realnvp(tf.keras.Model):

@@ -14,6 +14,7 @@ tfk = tf.keras
 from tensorflow.python.ops.numpy_ops import np_config
 
 np_config.enable_numpy_behavior()
+initializer = tf.keras.initializers.HeNormal()
 
 class GaussianMixtureSpatialModel(tf.keras.Model):
 
@@ -57,7 +58,6 @@ class GaussianMixtureSpatialModel(tf.keras.Model):
 
 
     def spatial_conditional_logprob_fn(self, t, input_time, input_loc, aux_state=None):
-        print(f'shapes are {t.shape}, {input_time.shape}, {input_loc.shape}')
         """
         Args:
             t: scalar
@@ -66,17 +66,20 @@ class GaussianMixtureSpatialModel(tf.keras.Model):
 
         Returns a function that takes locations (N, D) and returns (N,) the logprob at time t.
         """
+
         if input_loc is None:
             return lambda s: tf.reduce_sum(gaussian_loglik(s, self.mu0[None], self.logstd0[None]), -1)
-
-        dt = t - input_time  #(T,)
+        dt = t[:,tf.newaxis] - input_time  #(T,)
         logweights = tf.nn.log_softmax(-dt / tf.nn.softplus(self.coeff_decay), axis=0)
-
         def loglikelihood_fn(s):
-            loglik = tf.reduce_sum(gaussian_loglik(s[:, None], input_loc[None], self.spatial_logstd), -1)
-            return tf.reduce_logsumexp(loglik + logweights[None], axis=1)
+
+            s = tf.cast(s, tf.float32)
+            loglik = tf.reduce_sum(gaussian_loglik(s.reshape(-1,input_loc.shape[0], 1, input_loc.shape[-1]), input_loc, self.spatial_logstd), -1)
+            return tf.reduce_logsumexp(loglik + tf.squeeze(logweights[None], -1), axis=-1).reshape(-1)
 
         return loglikelihood_fn
+
+
 
 
 
@@ -144,23 +147,30 @@ class ConditionalGMM(tf.keras.Model):
 
         Returns a function that takes locations (N, D) and returns (N,) the logprob at time t.
         """
-        T, D = input_loc.shape
+        B, T, D = input_loc.shape
         #input_time = tf.squeeze(input_time, -1)
 
         def loglikelihood_fn(s):
+            s = tf.cast(s, tf.float32)
+
             bsz = s.shape[0]
-            bsz_event_times = tf.broadcast_to(input_time, (bsz, T))
-            bsz_event_times = bsz_event_times[..., tf.newaxis]
-            bsz_event_times = tf.concat([bsz_event_times, tf.cast(tf.ones((bsz, 1, 1))* t, bsz_event_times.dtype) ], axis=1)
-            bsz_spatial_locations = tf.broadcast_to(input_loc[tf.newaxis,...], (bsz, T, D))
+            bsz_t = tf.cast(tf.divide(bsz, input_time.shape[0]), tf.int32)
+            bsz_event_times = tf.broadcast_to(input_time[None], (bsz_t, *input_time.shape))
+
+            bsz_event_times = bsz_event_times.reshape(bsz, T, 1)
+            #bsz_event_times = bsz_event_times[..., tf.newaxis]
+            bsz_event_times = tf.concat([bsz_event_times, tf.cast((tf.ones((bsz_t, 1, 1))* t).reshape(bsz,1,1), bsz_event_times.dtype) ], axis=1)
+            bsz_spatial_locations = tf.broadcast_to(input_loc[None], (bsz_t, *input_loc.shape))
+            bsz_spatial_locations = bsz_spatial_locations.reshape(bsz, T, D)
             bsz_spatial_locations = tf.concat([bsz_spatial_locations, s.reshape(bsz, 1, D)], axis=1)
 
             if aux_state is not None:
-                bsz_aux_state = tf.broadcast_to(aux_state, (bsz, T + 1, 1))
+                bsz_aux_state = tf.broadcast_to(aux_state[None], (bsz_t, aux_state.shape[0], T + 1, 1))
+                bsz_aux_state = bsz_aux_state.reshape(bsz, T+1, -1)
+
             else:
                 bsz_aux_state = None
-
-            return tf.reduce_sum(self.call(bsz_event_times, bsz_spatial_locations, aux_state=bsz_aux_state), -1)  #(bsz,1,D)
+            return tf.reduce_sum(self.call(bsz_event_times, bsz_spatial_locations, aux_state=bsz_aux_state), -1)
 
         return loglikelihood_fn
 
@@ -211,12 +221,12 @@ def mlp(dim=2, hidden_dims=(64), out_dim=None, actfn='softplus'):
         dims = [dim] + list(hidden_dims)
         layers = []
         for d_in, d_out in zip(dims[:-1], dims[1:]):
-            layers.append(tfk.layers.Dense(d_out, activation = actfn))
-        layers.append(tfk.layers.Dense(out_dim))
+            layers.append(tfk.layers.Dense(d_out, activation = actfn ,kernel_initializer=initializer))
+        layers.append(tfk.layers.Dense(out_dim,kernel_initializer=initializer))
         print(f'{tfk.models.Sequential(layers)}')
     else:
 
-        layers = [tfk.layers.Dense(out_dim)]
+        layers = [tfk.layers.Dense(out_dim,kernel_initializer=initializer)]
 
     return tfk.models.Sequential(layers)
 

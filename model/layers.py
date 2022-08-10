@@ -15,6 +15,7 @@ from model.functions import positional_encoding, problayer_dec_time, problayer_d
 from tensorflow.python.ops.numpy_ops import np_config
 
 np_config.enable_numpy_behavior()
+initializer = tf.keras.initializers.HeNormal()
 
 
 class EncoderLayer(Layer):
@@ -27,8 +28,8 @@ class EncoderLayer(Layer):
                                       key_dim=embedding_dim,
                                       dropout=dropout_rate)
 
-        self.ffn1 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn2 = Dense(embedding_dim)  # (batch_size, seq_len, d_model)
+        self.ffn1 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn2 = Dense(embedding_dim,kernel_initializer=initializer)  # (batch_size, seq_len, d_model)
 
         self.layernorm1 = LayerNormalization(epsilon=layernorm_eps)
         self.layernorm2 = LayerNormalization(epsilon=layernorm_eps)
@@ -75,18 +76,18 @@ class Encoder(Layer):
                                             layernorm_eps=layernorm_eps)
                                for _ in range(self.num_layers)]
 
-        self.dense_time = Dense(self.embedding_dim)
-        self.dense_loc = Dense(self.embedding_dim)
-        self.dense_mag = Dense(self.embedding_dim)
+        self.dense_time = Dense(self.embedding_dim,kernel_initializer=initializer)
+        self.dense_loc = Dense(self.embedding_dim,kernel_initializer=initializer)
+        self.dense_mag = Dense(self.embedding_dim,kernel_initializer=initializer)
 
         # time
-        self.ffn1 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn2 = Dense(dim_out_time)  # (batch_size, seq_len, d_model)
+        self.ffn1 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn2 = Dense(dim_out_time,kernel_initializer=initializer)  # (batch_size, seq_len, d_model)
         self.dropout_time = Dropout(dropout_rate)
 
         # space
-        self.ffn3 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn4 = Dense(dim_out_loc)  # (batch_size, seq_len, d_model)
+        self.ffn3 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn4 = Dense(dim_out_loc,kernel_initializer=initializer)  # (batch_size, seq_len, d_model)
         self.dropout_loc = Dropout(dropout_rate)
 
     def call(self, x, training, look_ahead_mask):
@@ -149,8 +150,8 @@ class DecoderLayer(Layer):
                                        key_dim=embedding_dim,
                                        dropout=dropout_rate)
 
-        self.ffn1 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn2 = Dense(embedding_dim)
+        self.ffn1 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn2 = Dense(embedding_dim,kernel_initializer=initializer)
 
         self.layernorm1 = LayerNormalization(epsilon=layernorm_eps)
         self.layernorm2 = LayerNormalization(epsilon=layernorm_eps)
@@ -209,17 +210,17 @@ class Decoder(Layer):
                                for _ in range(self.num_layers)]
         # time
         self.dropout_time = Dropout(dropout_rate)
-        self.ffn1 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn2 = Dense(dim_out_time)  # for time dim_out should be 4 and for space should be 3
+        self.ffn1 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn2 = Dense(dim_out_time,kernel_initializer=initializer)  # for time dim_out should be 4 and for space should be 3
 
         # space
         self.dropout_loc = Dropout(dropout_rate)
-        self.ffn3 = Dense(fc_dim, activation='elu')  # (batch_size, seq_len, dff)
-        self.ffn4 = Dense(dim_out_loc)  # for time dim_out should be 4 and for space should be 3
+        self.ffn3 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)  # (batch_size, seq_len, dff)
+        self.ffn4 = Dense(dim_out_loc,kernel_initializer=initializer)  # for time dim_out should be 4 and for space should be 3
 
-        self.dense_time = Dense(embedding_dim)
-        self.dense_mag = Dense(embedding_dim)
-        self.dense_loc = Dense(embedding_dim)
+        self.dense_time = Dense(embedding_dim,kernel_initializer=initializer)
+        self.dense_mag = Dense(embedding_dim,kernel_initializer=initializer)
+        self.dense_loc = Dense(embedding_dim,kernel_initializer=initializer)
 
     def call(self, x, enc_output, training, look_ahead_mask):
         enc_output_time, enc_output_loc = enc_output

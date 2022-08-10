@@ -20,7 +20,7 @@ from tensorflow.python.ops.numpy_ops import np_config
 
 np_config.enable_numpy_behavior()
 
-
+initializer = tf.keras.initializers.HeNormal()
 class Transformer(Model):
     """
     Complete transformer with an Encoder and a Decoder
@@ -69,14 +69,14 @@ class Transformer(Model):
                                        input_shape=(max_positional_encoding_target, dim_out_loc,),
                                        variable='loc')
 
-        self.ffn1 = Dense(fc_dim, activation='elu')
-        self.ffn2 = Dense(embedding_dim_dec)
+        self.ffn1 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)
+        self.ffn2 = Dense(embedding_dim_dec,kernel_initializer=initializer)
         self.dropout_time1 = Dropout(dropout_rate)
         self.dropout_time2 = Dropout(dropout_rate)
         self.bij_time = SoftSignModel()
 
-        self.ffn3 = Dense(fc_dim, activation='elu')
-        self.ffn4 = Dense(embedding_dim_dec)
+        self.ffn3 = Dense(fc_dim, activation='elu',kernel_initializer=initializer)
+        self.ffn4 = Dense(embedding_dim_dec,kernel_initializer=initializer)
         self.dropout_loc1 = Dropout(dropout_rate)
         self.dropout_loc2 = Dropout(dropout_rate)
 
