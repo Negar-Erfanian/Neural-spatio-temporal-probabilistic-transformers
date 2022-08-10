@@ -208,7 +208,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
         for epoch in range(num_epochs):
             epoch_start = time.time()
 
-            for train_batch in tqdm(train_dataset):
+            for train_batch in train_dataset:
                 for i in range(10):
                     gc.collect()
                 train_ds_in_stack, train_ds_out_stack, train_ds_in_lookaheadmask, train_ds_out_lookaheadmask = \
@@ -227,16 +227,22 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                         grads = tape.gradient(loss, model.trainable_variables)
                 else:
                     with tf.GradientTape() as tape:
-                        loss_time, loss_space, train_expected_times = model(train_ds_in_stack, train_ds_out_stack)
+
+                        loss_time_enc, loss_space_enc, train_expected_times,\
+                        train_expected_locs, train_temporal_loglik, train_spatial_loglik= model(train_ds_in_stack, train_ds_out_stack)
+                        loss_time = -tf.reduce_mean(train_temporal_loglik)
+                        loss_space = -tf.reduce_mean(train_spatial_loglik)
                         loss = loss_time + loss_space
                         tape.watch(model.trainable_variables)
                         grads = tape.gradient(loss, model.trainable_variables)
+
 
                 train_loss_metric.update_state(loss)
                 train_loss_metric_time.update_state(loss_time)
                 train_loss_metric_space.update_state(loss_space)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
+                print(f'we have train loss as {train_loss_metric.result().numpy()}')
             train_losses.append(train_loss_metric.result().numpy())
 
             for i in range(10):
@@ -265,10 +271,12 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
 
 
                     else:
-                        loss_val_time, loss_val_space, val_expected_times = model(val_ds_in_stack, val_ds_out_stack)
+                        loss_val_time_enc, loss_val_space_enc, val_expected_times, \
+                        val_expected_locs, val_temporal_loglik, val_spatial_loglik = model(val_ds_in_stack, val_ds_out_stack)
+                        loss_val_time = -tf.reduce_mean(val_temporal_loglik)
+                        loss_val_space = -tf.reduce_mean(val_spatial_loglik)
                         loss_val = loss_val_time + loss_val_space
                         print(f'we have time prediction outputs and true outputs as {val_expected_times[:, 0]} and {val_ds_time_out[0]}')
-
                     val_loss_metric(loss_val)
                     val_loss_metric_time(loss_val_time)
                     val_loss_metric_space(loss_val_space)
@@ -381,7 +389,10 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                                              savepath=experiments_figs_loc,
                                              count=count, idx=idx)
             else:
-                loss_test_time, loss_test_space, test_expected_times = model(test_ds_in_stack, test_ds_out_stack)
+                loss_test_time_enc, loss_test_space_enc, test_expected_times, \
+                test_expected_locs, test_temporal_loglik, test_spatial_loglik = model(test_ds_in_stack, test_ds_out_stack)
+                loss_test_time = -tf.reduce_mean(test_temporal_loglik)
+                loss_test_space = -tf.reduce_mean(test_spatial_loglik)
                 loss_test = loss_test_time + loss_test_space
                 print(f'we have time prediction outputs and true outputs as {test_expected_times[:, 0]} and {test_ds_time_out[0]}')
                 idx = -1
@@ -390,9 +401,9 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 if os.path.exists(experiments_figs_loc_gmm) == False:
                     os.mkdir(experiments_figs_loc_gmm)
                 if dim == 2:
-                    plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                    plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
                 else:
-                    plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0], test_ds_time_in[idx,:,0], test_ds_loc_in[idx], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                    plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
 
 
             test_loss_metric(loss_test)
