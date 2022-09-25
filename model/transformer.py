@@ -29,7 +29,7 @@ class Transformer(Model):
     def __init__(self, num_layers, embedding_dim_enc, embedding_dim_dec, num_heads, fc_dim,
                  dim_out_time, dim_out_loc, max_positional_encoding_input,
                  max_positional_encoding_target, time_layer_prob,
-                 dropout_rate=0.3, layernorm_eps=1e-6):
+                 dropout_rate=0.1, layernorm_eps=1e-6):
         super(Transformer, self).__init__()
 
         self.fc_dim = fc_dim
@@ -85,13 +85,15 @@ class Transformer(Model):
                                input_shape=(max_positional_encoding_target, dim_out_loc,),
                                dim = dim_out_loc)
 
-    def call(self, inputs, outputs, training, look_ahead_mask_in, look_ahead_mask_out):
+    def call(self, inputs, outputs, training, look_ahead_mask_in, look_ahead_mask_out= None):
         scale = 2.
         input_time, input_loc, input_mag, input_timediff = inputs
         output_time, output_loc, output_mag, output_timediff = outputs
 
+        if look_ahead_mask_in!=None:
+            look_ahead_mask_in = tf.cast(look_ahead_mask_in, tf.bool)
         enc_output_time, enc_output_loc, attention_weights_enc = \
-            self.encoder(inputs, training, tf.cast(look_ahead_mask_in, tf.bool))  # final dim for enc_output_time is #batch * #seq_len * 1
+            self.encoder(inputs, training, look_ahead_mask_in)  # final dim for enc_output_time is #batch * #seq_len * 1
 
         #################################
         # time
@@ -120,9 +122,10 @@ class Transformer(Model):
         enc_output = [enc_output_time, enc_output_loc]
 
         if training:
-
+            if look_ahead_mask_out!=None:
+                look_ahead_mask_out = tf.cast(look_ahead_mask_out, tf.bool)
             dec_output_time, dec_output_loc, attention_weights_dec = \
-                self.decoder(outputs, enc_output, training, tf.cast(look_ahead_mask_out, tf.bool))
+                self.decoder(outputs, enc_output, training, look_ahead_mask_out)
 
             #################################
 
@@ -148,9 +151,10 @@ class Transformer(Model):
             probl2_output_loc = self.bij_loc.sample(probl2_dist_loc, 100)
 
         else:
-
+            if look_ahead_mask_out!=None:
+                look_ahead_mask_out = tf.cast(look_ahead_mask_out, tf.bool)
             dec_output_time, dec_output_loc, attention_weights_dec = \
-                self.decoder(outputs_zero, enc_output, training, tf.cast(look_ahead_mask_out, tf.bool))
+                self.decoder(outputs_zero, enc_output, training, look_ahead_mask_out)
 
             #################################
 

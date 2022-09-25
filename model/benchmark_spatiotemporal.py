@@ -44,7 +44,6 @@ class Spatiotemporal(tf.keras.Model):
         spatial_loglik = self.spatial_model.call(input_time, input_loc, aux_state)
 
 
-        loss = -tf.reduce_mean(temporal_loglik)-tf.reduce_mean(spatial_loglik)
         loss_time = -tf.reduce_mean(temporal_loglik)
         loss_space = -tf.reduce_mean(spatial_loglik)
         expected_times = self.temporal_model.predict(input_time, output_time)
@@ -52,13 +51,14 @@ class Spatiotemporal(tf.keras.Model):
         spatial_model = self.spatial_model
         spatial_loglik, expected_locs = spatial_prediction(output_time, input_time, input_loc, output_loc, input_mag, output_mag, spatial_model, self.dim)
         temporal_loglik, _= self.temporal_model.call(expected_times[..., tf.newaxis])
-
+        expected_locs = tf.convert_to_tensor(expected_locs, dtype=tf.float32)
+        expected_locs = tf.reshape(expected_locs, (expected_locs.shape[1], expected_locs.shape[0], -1))
         return loss_time, loss_space, expected_times, expected_locs, temporal_loglik ,spatial_loglik
 
 
 
 def spatial_prediction(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, dim):
-    N = 30
+    N = 25
     if dim ==3:
         N = 10
     plts =  expected_data.shape[1]
@@ -87,11 +87,21 @@ def spatial_prediction(curr_time, input_time, history_data, expected_data, aux_s
         arr = arr.reshape(-1, arr.shape[-1])
         loglikelihood_fn = model.spatial_conditional_logprob_fn(current_time, input_time, history_data, aux_state)
         loglikelihood = loglikelihood_fn(arr)
-        norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
-        predicted = tf.reduce_max((arr*norm_loglik[...,tf.newaxis]).reshape(expected_data.shape[0], N*N, -1),1)  #(batch,d)
-        #print(f'predicted is {predicted}')
-        if dim == 3:
-            predicted = tf.reduce_max((arr * norm_loglik[..., tf.newaxis]).reshape(expected_data.shape[0], N * N * N, -1),1)  # (batch,d)
+        #norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
+        if dim == 2:
+            predicted_arg = tf.math.argmax(loglikelihood.reshape(expected_data.shape[0], N * N), -1)
+            arr_reshaped = arr.reshape(expected_data.shape[0], N * N , -1)
+            predicted = []
+            for j in range(expected_data.shape[0]):
+                predicted.append(arr_reshaped[j, predicted_arg[j], :])
+            predicted = tf.concat([predicted], axis = 0)
+        elif dim == 3:
+            predicted_arg = tf.math.argmax(loglikelihood.reshape(expected_data.shape[0], N * N * N), -1)
+            arr_reshaped = arr.reshape(expected_data.shape[0], N * N *N, -1)
+            predicted = []
+            for j in range(expected_data.shape[0]):
+                predicted.append(arr_reshaped[j, predicted_arg[j], :])
+            predicted = tf.concat([predicted], axis=0)
         predicted_list.append(predicted)
         history_data = tf.concat([history_data, tf.cast(predicted[:,tf.newaxis, :], dtype = tf.float32)], axis=1)
         history_data = tf.cast(history_data, dtype = tf.float32)

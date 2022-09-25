@@ -160,13 +160,16 @@ class ConditionalGMM(tf.keras.Model):
             bsz_event_times = bsz_event_times.reshape(bsz, T, 1)
             #bsz_event_times = bsz_event_times[..., tf.newaxis]
             bsz_event_times = tf.concat([bsz_event_times, tf.cast((tf.ones((bsz_t, 1, 1))* t).reshape(bsz,1,1), bsz_event_times.dtype) ], axis=1)
+            bsz_event_times = tf.cast(bsz_event_times, tf.float32)
             bsz_spatial_locations = tf.broadcast_to(input_loc[None], (bsz_t, *input_loc.shape))
             bsz_spatial_locations = bsz_spatial_locations.reshape(bsz, T, D)
+            bsz_spatial_locations = tf.cast(bsz_spatial_locations, tf.float32)
             bsz_spatial_locations = tf.concat([bsz_spatial_locations, s.reshape(bsz, 1, D)], axis=1)
 
             if aux_state is not None:
                 bsz_aux_state = tf.broadcast_to(aux_state[None], (bsz_t, aux_state.shape[0], T + 1, 1))
                 bsz_aux_state = bsz_aux_state.reshape(bsz, T+1, -1)
+                bsz_aux_state = tf.cast(bsz_aux_state, tf.float32)
 
             else:
                 bsz_aux_state = None

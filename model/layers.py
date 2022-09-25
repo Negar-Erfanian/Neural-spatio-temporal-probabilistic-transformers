@@ -37,9 +37,11 @@ class EncoderLayer(Layer):
         self.dropout_ffn = Dropout(dropout_rate)
 
     def call(self, x, training, look_ahead_mask):
-        attn_output, attn_scores = self.mha(x, x, x, attention_mask=look_ahead_mask, training=training,
-                                            return_attention_scores=True)
-
+        if look_ahead_mask != None:
+            attn_output, attn_scores = self.mha(x, x, x, attention_mask=look_ahead_mask, training=training,
+                                                return_attention_scores=True)
+        else:
+            attn_output, attn_scores = self.mha(x, x, x, training=training, return_attention_scores=True)
         Q = self.layernorm1(attn_output + x)
 
         ffn_output = self.ffn2(self.ffn1(Q))
@@ -160,8 +162,12 @@ class DecoderLayer(Layer):
         self.dropout_ffn = Dropout(dropout_rate)
 
     def call(self, x, enc_output, training, look_ahead_mask):
-        mult_attn_out1, attn_weights_block1 = \
-            self.mha1(x, x, x, training=training, attention_mask=look_ahead_mask, return_attention_scores=True)  # (batch_size, target_seq_len, d_model)  #look_ahead_mask
+        if look_ahead_mask!= None:
+            mult_attn_out1, attn_weights_block1 = \
+                self.mha1(x, x, x, training=training, attention_mask=look_ahead_mask, return_attention_scores=True)  # (batch_size, target_seq_len, d_model)  #look_ahead_mask
+        else:
+            mult_attn_out1, attn_weights_block1 = \
+                self.mha1(x, x, x, training=training, return_attention_scores=True)  # (batch_size, target_seq_len, d_model)  #look_ahead_mask
 
         Q1 = self.layernorm1(mult_attn_out1 + x)
 
