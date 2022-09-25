@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import statistics
 
@@ -54,28 +55,75 @@ def process_data_earth(filename, event_num, seqs='fixed'):  # 'variable'
     event_num = event_num  # 300
     mean = np.mean(df[['Lat', 'Long', 'Depth', 'Mag']], axis=0)
     std = np.std(df[['Lat', 'Long', 'Depth', 'Mag']], axis=0)
-
+    sss = []
     if seqs == 'fixed':
-        print('we are here')
+        fig = plt.figure(figsize=(20, 5))
+        ax = fig.add_subplot(1, 6, 1)
+        ax.hist(df.to_numpy()[:, 0], bins=50)
+        ax.grid()
+        ax = fig.add_subplot(1, 6, 2)
+        ax.hist(df.to_numpy()[:, 1], bins=50)
+        ax.grid()
+        ax = fig.add_subplot(1, 6, 3)
+        ax.hist(df.to_numpy()[:, 2], bins=50)
+        ax.grid()
+        ax = fig.add_subplot(1, 6, 4)
+        ax.hist(df.to_numpy()[:, 3], bins=50)
+        ax.grid()
+        ax = fig.add_subplot(1, 6, 5)
+        ax.hist(df.to_numpy()[:, 4], bins=50)
+        ax.grid()
+        ax = fig.add_subplot(1, 6, 6)
+        ax.hist(df.to_numpy()[:, 5], bins=50)
+        ax.grid()
+        # ax.set_xlim(-4, 4)
+        # ax.set_ylim(-4, 4)
+        # ax.set_yticklabels([])
+        # ax.set_xticklabels([])
+        fig.tight_layout()
+        plt.savefig(f'earthquakehist.png')
+
+
         for range_ in range(5000):
             start = range_ * 2
             seq_name = f'{range_}'
             df_ = df.iloc[start:start + event_num]
             seq = df_.to_numpy().astype(np.float32)
+            sss.append(seq)
             if seq.shape[0] < event_num:
-                print('we are skipping becuz of length', seq_name)
+                #print('we are skipping becuz of length', seq_name)
                 continue
             time, space, mag, time_diff = \
                 df_.to_numpy().astype(np.float32)[:, 0:1], df_.to_numpy().astype(np.float32)[:, 1:4], df_.to_numpy().astype(np.float32)[:, 4:5], df_.to_numpy().astype(np.float32)[:, 5:6]
-            print(f'time[-1]  is {time[-1]}')
             sequences[seq_name] = np.concatenate([time, space, mag, time_diff], axis=1)
 
             length.append(len(sequences[seq_name]))
+        im = plt.imread(f'data/map.png').transpose((1, 0, 2))
+        fig = plt.figure(figsize=(20, 5))
+        ax = fig.add_subplot(1, 5, 1)
+        ax.imshow(im, extent=[np.min(df.Lat), np.max(df.Lat),
+                              np.min(df.Long), np.max(df.Long)-1])
+        ax.scatter(df.to_numpy()[:, 1], df.to_numpy()[:, 2], marker='*', c='purple')
+        #ax.set_xlim(-4, 4)
+        #ax.set_ylim(-4, 4)
+        ax.set_yticklabels([])
+        ax.set_xticklabels([])
+        for i in range(2, 6):
+            ax = fig.add_subplot(1, 5, i)
+            ax.imshow(im, extent=[np.min(df.Lat), np.max(df.Lat),
+                              np.min(df.Long), np.max(df.Long)-1])
+            ax.scatter(sss[(i-1)*200][:, 1], sss[(i-1)*200][:, 2], marker = '*', c = 'purple')
+            #ax.set_xlim(-4,4)
+            #ax.set_ylim(-4, 4)
+            ax.set_yticklabels([])
+            ax.set_xticklabels([])
+            fig.tight_layout()
+            plt.savefig(f'califdata.png')
 
-        #print(f'min length is {min(length)}, max length is {max(length)}, average length is {statistics.mean(length)}.')
+        print(f'min length is {min(length)}, max length is {max(length)}, average length is {statistics.mean(length)}.')
 
-        #print(f'in the forward process we have {len(sequences)} files')
-        #np.savez('earthquakes_calif.npz', **sequences)
+        print(f'in the forward process we have {len(sequences)} files')
+        np.savez('data/earthquakes_calif.npz', **sequences)
 
 
 
@@ -93,7 +141,7 @@ def process_data_earth(filename, event_num, seqs='fixed'):  # 'variable'
             seq_name = f'{date.year}{date.month:02d}{date.day:02d}'
             seq = df_.to_numpy().astype(np.float32)
             if seq.shape[0] < 40:
-                print('we are skipping becuz of length', seq_name)
+                #print('we are skipping becuz of length', seq_name)
                 continue
 
             elif np.max(df_["Time"]) <= 35:
