@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import tensorflow_probability as tfp
+from scipy import ndimage
+
 
 tfd = tfp.distributions
 
@@ -136,7 +138,7 @@ def plot_expected_intensity(bij_time, timediff_out, savepath, count):
     plt.close()
 
 def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, curr_path, savepath, count, idx):
-    N = 60
+    N = 80
     plts =  expected_data.shape[1]
     fig = plt.figure(figsize=(18, 8))
     im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))
@@ -175,10 +177,24 @@ def plot_expected_3d_density_gmm(curr_time, input_time, history_data, expected_d
 
 
         ax = fig.add_subplot(2, plts, i+1)
+
+        if i == 0:
+            first_result = tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])]*0.05
+
+            imag = ax.imshow(ndimage.rotate(first_result, -90).T, cmap='RdGy', vmin=0.0, vmax=1.0,
+                             extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
+                                     np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
+        else:
+            result = tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])]*0.05 - first_result
+            first_result = tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])]*0.05
+            imag = ax.imshow(ndimage.rotate(np.abs(result), -90).T*4 , cmap='RdGy', vmin=0.4, vmax=0.5,
+                             extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
+                                     np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
+
         # plot background
         #ax.imshow(im, extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
         #                      np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
-        imag = ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])]*0.005, levels=800, alpha=0.7, cmap='RdGy', vmin = 0, vmax = 0.1)
+        #imag = ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(loglikelihood)[:,:,int(expected_data[0][i,2])]*0.005, levels=800, alpha=0.7, cmap='RdGy', vmin = 0, vmax = 0.1)
         ax.scatter(predicted[0, 0], predicted[0, 1], marker='*', color='red', s=250)
         ax.scatter(history_data[0,-50:, 0], history_data[0,-50:, 1], marker='*', color='black', s=70)
         ax.scatter(expected_loc[0,0, 0], expected_loc[0,0, 1], marker='o', color='green', s=200)
@@ -216,7 +232,7 @@ def plot_expected_2d_density_gmm(curr_time, input_time, history_data, expected_d
     N = 100
     plts =  expected_data.shape[1]
     ll = []
-    fig = plt.figure(figsize=(16, 4))
+    fig = plt.figure(figsize=(12, 4))
     #im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))
     for i in range(plts):
         current_time = curr_time[:,i]
@@ -238,6 +254,7 @@ def plot_expected_2d_density_gmm(curr_time, input_time, history_data, expected_d
                                                                               aux_state=aux_state)
         loglikelihood = loglikelihood_fn(arr)
         norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
+
         #predicted = tf.reduce_max((arr * norm_loglik[..., tf.newaxis]).reshape(expected_data.shape[0], N * N , -1),1)  # (batch,d)
         predicted_arg = tf.math.argmax(norm_loglik.reshape(expected_data.shape[0], N * N ), -1)
         arr_reshaped = arr.reshape(expected_data.shape[0], N * N, -1)
@@ -251,10 +268,24 @@ def plot_expected_2d_density_gmm(curr_time, input_time, history_data, expected_d
 
 
         ax = fig.add_subplot(1, plts, i+1)
+
+        if i == 0:
+            first_result = tf.exp(loglikelihood)
+
+            imag = ax.imshow(ndimage.rotate(first_result, -90).T*0.38, cmap='RdGy', vmin=0.8, vmax=1.0,
+                             extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
+                                     np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
+        else:
+            result = tf.exp(loglikelihood) - first_result
+            first_result = tf.exp(loglikelihood)
+            imag = ax.imshow(ndimage.rotate(np.abs(result), -90).T*40 , cmap='RdGy', vmin=0.02, vmax=0.1,
+                             extent=[np.min(normalized_data[:,:, 0]), np.max(normalized_data[:,:, 0]),
+                                     np.min(normalized_data[:,:, 1]), np.max(normalized_data[:,:, 1])])
+
         # plot background
         #ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
         #                      np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
-        imag = ax.contourf(X1, X2, tf.exp(loglikelihood)*0.1, levels=800, alpha=0.7, cmap='RdGy', vmin = 0.2, vmax = 0.3)
+        #imag = ax.contourf(X1, X2, tf.exp(loglikelihood)*0.1, levels=800, alpha=0.7, cmap='RdGy', vmin = 0.2, vmax = 0.3)
         ax.scatter(predicted[0,0], predicted[0,1], marker='*', color='red', s=200)
         ax.scatter(history_data[0,-50:, 0], history_data[0,-50:, 1], marker='*', color='black', s=70)
         ax.scatter(expected_loc[0,0,0], expected_loc[0,0,1], marker='o', color='green', s=200)
@@ -309,13 +340,23 @@ def plot_expected_3d_density(history_data, expected_data, model, curr_path, dec_
             # plot background
             #ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
             #                      np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
-            ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])] , levels=800, alpha=0.7,
-                        cmap='RdGy')
-            imag = ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])]*0.7 , levels=800, alpha=0.7
-                               , cmap='RdGy', vmin = 0.0, vmax = 0.05)
-            #imag = ax.imshow(tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])] * 100,
-            #          extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
-            #                  np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])], origin='lower', cmap='RdGy')
+            if i ==0:
+                first_result = tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])]
+                imag = ax.contourf(X1[:, :, 0], X2[:, :, 0], first_result , levels=800, alpha=0.7
+                                   , cmap='RdGy', vmin = 0.0, vmax = 0.05)
+                imag = ax.imshow(first_result*10, cmap='RdGy', vmin=0.0, vmax=1,
+                                 extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
+                                         np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
+            else:
+                result = tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])] - first_result
+                first_result = tf.exp(log_likelihood1)[:, :, int(expected_data[i, 2])]
+                imag = ax.contourf(X1[:, :, 0], X2[:, :, 0],
+                                   result, levels=800, alpha=0.7
+                                   , cmap='RdGy', vmin=0.0, vmax=0.05)
+                imag = ax.imshow(np.abs(result), cmap='RdGy', vmin=0.0, vmax=0.5,
+                                 extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
+                                         np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
+
             ax.scatter(history_data[-50:, 0], history_data[-50:, 1], marker='*', color='black', s=70)
             ax.scatter(expected_data[i, 0], expected_data[i, 1], marker='o', color='green', s=200)
             plt.colorbar(imag)
@@ -326,10 +367,8 @@ def plot_expected_3d_density(history_data, expected_data, model, curr_path, dec_
             ax = fig.add_subplot(2, log_likelihood.shape[-1], i + 1, projection='3d')
             ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(log_likelihood1)[:, :, -1], levels=800, alpha=0.7, cmap='RdGy',
                         zdir='z', offset=zlim[-1])
-            # ax.contourf(X1[:,:,0], X2[:,:,0], tf.exp(log_likelihood1)[:,:,70], levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=zlim[70])
             ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(log_likelihood1)[:, :, int(expected_data[i - log_likelihood.shape[-1], 2])] ,
                         levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=expected_data[i - log_likelihood.shape[-1], 2])
-            # ax.contourf(X1[:,:,0], X2[:,:,0], tf.exp(log_likelihood1)[:,:,20]*100, levels=800, alpha=0.7, cmap='RdGy', zdir='z', offset=zlim[20])
             ax.contourf(X1[:, :, 0], X2[:, :, 0], tf.exp(log_likelihood1)[:, :, 0], levels=800, alpha=0.7, cmap='RdGy',
                         zdir='z', offset=zlim[0])
 
@@ -350,7 +389,7 @@ def plot_expected_3d_density(history_data, expected_data, model, curr_path, dec_
     plt.close()
 
 def plot_expected_2d_density(history_data, expected_data, model, curr_path, dec_dist_loc, savepath, count, idx):
-    N = 85
+    N = 100
     stacks = []
     normalized_data = np.concatenate([history_data, expected_data], axis=0)
     minx, maxx = tf.math.reduce_min(normalized_data[:, 0]), tf.math.reduce_max(normalized_data[:, 0])
@@ -369,20 +408,31 @@ def plot_expected_2d_density(history_data, expected_data, model, curr_path, dec_
     #print(f'log_likelihood shape is {log_likelihood.shape}')
     log_likelihood = log_likelihood[:, 0, :]
 
-    fig = plt.figure(figsize=(16, 4))
+    fig = plt.figure(figsize=(12, 4))
     im = plt.imread(f'{curr_path}/data/map.png').transpose((1, 0, 2))  # background faults image
     # fig, viewer = plt.subplots(1, log_likelihood.shape[-1])
     # fig.tight_layout()
-    # fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)
 
     for i in range(log_likelihood.shape[-1]):  # log_likelihood.shape[-1]
         #print(f'log_likelihood dim is {log_likelihood.shape}')
         log_likelihood1 = log_likelihood[:, i]
         log_likelihood1 = log_likelihood1.reshape(N, N)
         ax = fig.add_subplot(1, log_likelihood.shape[-1], i + 1)
+        if i == 0:
+            first_result = tf.exp(log_likelihood1)
+            imag = ax.imshow(ndimage.rotate(first_result, -90).T*1.8, cmap='RdGy', vmin=0.0, vmax=1,
+                             extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
+                                     np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
+        else:
+            result = tf.exp(log_likelihood1) - first_result
+            first_result = tf.exp(log_likelihood1)
+            imag = ax.imshow(ndimage.rotate(np.abs(result), -90).T, cmap='RdGy', vmin=0.0, vmax=0.004,
+                             extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
+                                     np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
+
         # plot background
         #ax.imshow(im, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]), np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])])
-        imag = ax.contourf(X1, X2, tf.exp(log_likelihood1) , levels=800, alpha=0.7,cmap='RdGy')
+        #imag = ax.contourf(X1, X2, tf.exp(log_likelihood1) , levels=800, alpha=0.7,cmap='RdGy')
         #imag = ax.imshow(tf.exp(log_likelihood1) * 100, extent=[np.min(normalized_data[:, 0]), np.max(normalized_data[:, 0]),
         #                      np.min(normalized_data[:, 1]), np.max(normalized_data[:, 1])], origin='lower', cmap='RdGy')
 
@@ -390,7 +440,7 @@ def plot_expected_2d_density(history_data, expected_data, model, curr_path, dec_
         ax.scatter(expected_data[i, 0], expected_data[i, 1], marker='o', color='green', s=200)
         plt.colorbar(imag)
 
-
+    #fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)
     fig.tight_layout()
 
     # fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.1, hspace=0.1)

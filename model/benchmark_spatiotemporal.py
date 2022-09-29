@@ -34,12 +34,13 @@ class Spatiotemporal(tf.keras.Model):
         elif spatial_model == 'condgmm':
             self.spatial_model = ConditionalGMM(dim=dim, hidden_dims=[64, 64, 64], aux_dim=1)
         self.dim = dim
-    def call(self, inputs, outputs):
+    def call(self, inputs, outputs, training = True):
 
         input_time, input_loc, input_mag, input_timediff = inputs
         output_time, output_loc, output_mag, output_timediff = outputs
         aux_state = input_time
-        temporal_loglik, lamb = self.temporal_model.call(input_time)
+        #temporal_loglik, lamb = self.temporal_model.call(input_time)
+        temporal_loglik, lamb = self.temporal_model.call(output_time)
 
         spatial_loglik = self.spatial_model.call(input_time, input_loc, aux_state)
 
@@ -47,9 +48,10 @@ class Spatiotemporal(tf.keras.Model):
         loss_time = -tf.reduce_mean(temporal_loglik)
         loss_space = -tf.reduce_mean(spatial_loglik)
         expected_times = self.temporal_model.predict(input_time, output_time)
+        temporal_loglik, lamb = self.temporal_model.call(output_time)
         #expected_loc_func = self.spatial_modelspatial_conditional_logprob_fn(self, true_time, inputs)
         spatial_model = self.spatial_model
-        spatial_loglik, expected_locs = spatial_prediction(output_time, input_time, input_loc, output_loc, input_mag, output_mag, spatial_model, self.dim)
+        spatial_loglik, expected_locs = spatial_prediction(output_time, input_time, input_loc, output_loc, input_mag, output_mag, spatial_model, self.dim, training = training)
         temporal_loglik, _= self.temporal_model.call(expected_times[..., tf.newaxis])
         expected_locs = tf.convert_to_tensor(expected_locs, dtype=tf.float32)
         expected_locs = tf.reshape(expected_locs, (expected_locs.shape[1], expected_locs.shape[0], -1))
@@ -57,12 +59,13 @@ class Spatiotemporal(tf.keras.Model):
 
 
 
-def spatial_prediction(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, dim):
+def spatial_prediction(curr_time, input_time, history_data, expected_data, aux_state_in, aux_state_out, model, dim, training = True):
     N = 25
     if dim ==3:
         N = 10
     plts =  expected_data.shape[1]
     predicted_list = []
+    history = []
     for i in range(plts):
         current_time = curr_time[:,i]
         expected_loc = expected_data[:,i,:]
@@ -89,26 +92,33 @@ def spatial_prediction(curr_time, input_time, history_data, expected_data, aux_s
         loglikelihood = loglikelihood_fn(arr)
         #norm_loglik = (loglikelihood - np.min(loglikelihood)) / (np.max(loglikelihood) - np.min(loglikelihood))
         if dim == 2:
-            predicted_arg = tf.math.argmax(loglikelihood.reshape(expected_data.shape[0], N * N), -1)
+            predicted_arg = tf.math.argmin(loglikelihood.reshape(expected_data.shape[0], N * N), -1)
             arr_reshaped = arr.reshape(expected_data.shape[0], N * N , -1)
             predicted = []
             for j in range(expected_data.shape[0]):
                 predicted.append(arr_reshaped[j, predicted_arg[j], :])
             predicted = tf.concat([predicted], axis = 0)
         elif dim == 3:
-            predicted_arg = tf.math.argmax(loglikelihood.reshape(expected_data.shape[0], N * N * N), -1)
+            predicted_arg = tf.math.argmin(loglikelihood.reshape(expected_data.shape[0], N * N * N), -1)
             arr_reshaped = arr.reshape(expected_data.shape[0], N * N *N, -1)
             predicted = []
             for j in range(expected_data.shape[0]):
                 predicted.append(arr_reshaped[j, predicted_arg[j], :])
             predicted = tf.concat([predicted], axis=0)
         predicted_list.append(predicted)
+
         history_data = tf.concat([history_data, tf.cast(predicted[:,tf.newaxis, :], dtype = tf.float32)], axis=1)
         history_data = tf.cast(history_data, dtype = tf.float32)
         input_time = tf.concat([input_time, current_time[...,None]], axis=1)
         input_time = tf.cast(input_time, dtype = tf.float32)
-        spatial_loglik = model.call(input_time, history_data, aux_state)
         aux_state_in = aux_state
+    spatial_loglik = model.call(input_time, history_data, aux_state)
+    if not training:
+        #history_data = tf.stack(predicted_list, axis=1)
+        history_data = expected_data
+        history_data = tf.cast(history_data, dtype=tf.float32)
+        spatial_loglik = model.call(curr_time, history_data, aux_state)
+
 
     return spatial_loglik, predicted_list
 
