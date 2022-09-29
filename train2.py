@@ -411,7 +411,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 loss_test_time = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out))#+regularizer1 * tf.norm(tf.math.subtract(test_ds_timediff_out, test_ds_out_pred_time), ord=1)
                 loss_test_space = -tf.reduce_mean(test_bij_loc)#+ regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
                 loss_test = loss_test_time +loss_test_space  #+regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
-                experiments_figs_scores = exp_path +'/figures_train_scores/'
+                '''experiments_figs_scores = exp_path +'/figures_train_scores/'
                 if os.path.exists(experiments_figs_scores) == False:
                     os.mkdir(experiments_figs_scores)
                 plot_att_scores(test_att_weights_dec, savepath = experiments_figs_scores, count = count)
@@ -421,20 +421,18 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     os.mkdir(experiments_figs_time)
                 for idx in range(len(test_ds_loc_out)):
                     plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_ds_out_pred_time,
-                                      event_num, savepath=experiments_figs_time, count=count, idx = idx)
-
+                                      event_num, savepath=experiments_figs_time, count=count, idx = idx)'''
                 '''experiments_figs_timeintensity = exp_path + '/time_intensity_pred/'
                 if os.path.exists(experiments_figs_timeintensity) == False:
                     os.mkdir(experiments_figs_timeintensity)
                 plot_expected_intensity(test_bij_time, test_ds_timediff_out, savepath=experiments_figs_timeintensity,
                                         count=count)'''
 
-                '''curr_path = os.getcwd()
+                curr_path = os.getcwd()
                 experiments_figs_loc = exp_path + '/loc_pred/'
-                #experiments_figs_loc = exp_path + '/loc_pred_train/'
                 if os.path.exists(experiments_figs_loc) == False:
                     os.mkdir(experiments_figs_loc)
-                idx = -1
+
                 for idx in range(len(test_ds_loc_out)):
 
                     if dim ==2:
@@ -446,15 +444,13 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                                                  model=model,
                                                  curr_path=curr_path, dec_dist_loc=test_dec_dist_loc,
                                                  savepath=experiments_figs_loc,
-                                                 count=count, idx=idx)'''
+                                                 count=count, idx=idx)
             else:
                 loss_test_time_enc, loss_test_space_enc, test_expected_times, \
-                test_expected_locs, test_temporal_loglik, test_spatial_loglik = model(test_ds_in_stack, test_ds_out_stack)
+                test_expected_locs, test_temporal_loglik, test_spatial_loglik = model(test_ds_in_stack, test_ds_out_stack, training = False)
 
-                loss_test_time = -tf.reduce_mean(test_temporal_loglik)+ regularizer1 * tf.norm(tf.math.subtract(test_ds_time_out, test_expected_times),
-                                                ord=2)
-                loss_test_space = -tf.reduce_mean(test_spatial_loglik)+ regularizer2 * tf.norm(
-                            tf.math.subtract(test_ds_loc_out, test_expected_locs), ord=2)
+                loss_test_time = -tf.reduce_mean(test_temporal_loglik)#+ regularizer1 * tf.norm(tf.math.subtract(test_ds_time_out, test_expected_times),ord=2)
+                loss_test_space = -tf.reduce_mean(test_spatial_loglik)#+ regularizer2 * tf.norm(tf.math.subtract(test_ds_loc_out, test_expected_locs), ord=2)
                 loss_test = loss_test_time + loss_test_space
                 test_expected_times = np.transpose(test_expected_times)
                 test_expected_time_diff = test_expected_times[:, 0][...,None]
@@ -471,15 +467,15 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                                       event_num, savepath=experiments_figs_time, count=count, idx = idx)
                 print(f'we have time prediction outputs and true outputs as {test_expected_times[0]} and {test_ds_time_out[0]}')'''
                 curr_path = os.getcwd()
-                experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
+                '''experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
                 if os.path.exists(experiments_figs_loc_gmm) == False:
                     os.mkdir(experiments_figs_loc_gmm)
+               
                 for idx in range(test_ds_time_out.shape[0]):
                     if dim == 2:
                         plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
                     else:
-                        plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
-
+                        plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)'''
             test_loss_metric(loss_test)
             test_loss_metric_time(loss_test_time)
             test_loss_metric_space(loss_test_space)
