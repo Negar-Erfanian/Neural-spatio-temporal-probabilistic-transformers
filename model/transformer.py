@@ -85,10 +85,19 @@ class Transformer(Model):
                                input_shape=(max_positional_encoding_target, dim_out_loc,),
                                dim = dim_out_loc)
 
-    def call(self, inputs, outputs, training, look_ahead_mask_in, look_ahead_mask_out= None):
+    def call(self, inputs, outputs, training, look_ahead_mask_in, look_ahead_mask_out= None, ablation_type = None):
         scale = 2.
         input_time, input_loc, input_mag, input_timediff = inputs
         output_time, output_loc, output_mag, output_timediff = outputs
+
+        if ablation_type == 'histindept':
+            input_time = tf.ones_like(input_time) * 1e-9
+            input_loc = tf.ones_like(input_loc) * 1e-9
+            input_mag = tf.ones_like(input_mag) * 1e-9
+            input_timediff = tf.ones_like(input_timediff) * 1e-9
+            inputs = [input_time, input_loc, input_mag, input_timediff]
+        elif ablation_type == 'nodecoder':
+            training = False
 
         if look_ahead_mask_in!=None:
             look_ahead_mask_in = tf.cast(look_ahead_mask_in, tf.bool)
@@ -134,9 +143,7 @@ class Transformer(Model):
             dec_output_time += output_timediff
             dec_output_time = self.dropout_time2(dec_output_time, training=training)
             probl2_dist_time = self.problayer_time(dec_output_time)
-            # print(f'probl2_dist_time is {probl2_dist_time}')
             probl2_bij_time = self.bij_time(output_timediff, probl2_dist_time)
-            # print(f'probl2_bij_time is {probl2_bij_time}')
             probl2_output_time = tf.math.abs(tf.reduce_mean(self.bij_time.sample(100, probl2_dist_time), axis=0))
 
             #################################

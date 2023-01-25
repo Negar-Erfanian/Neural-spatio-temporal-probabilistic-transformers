@@ -96,28 +96,12 @@ def process_data_covid(file_name, event_num=500):
 
     sequences = {}
     fig = plt.figure(figsize=(20, 5))
-    ax = fig.add_subplot(1, 5, 1)
-    ax.hist(df.to_numpy()[:, 0], bins=50)
-    ax.grid()
-    ax = fig.add_subplot(1, 5, 2)
-    ax.hist(df.to_numpy()[:, 1], bins=50)
-    ax.grid()
-    ax = fig.add_subplot(1, 5, 3)
-    ax.hist(df.to_numpy()[:, 2], bins=50)
-    ax.grid()
-    ax = fig.add_subplot(1, 5, 4)
-    ax.hist(df.to_numpy()[:, 3], bins=5000)
-    ax.set_xlim(0, 500)
-    ax.grid()
-    ax = fig.add_subplot(1, 5, 5)
-    ax.hist(df.to_numpy()[:, 4], bins=50)
-
-    ax.set_xlim(0, 0.005)
-    ax.grid()
-    # ax.set_xlim(-4, 4)
-    # ax.set_ylim(-4, 4)
-    # ax.set_yticklabels([])
-    # ax.set_xticklabels([])
+    for i in range(5):
+        ax = fig.add_subplot(1, 5, i+1)
+        ax.hist(df.to_numpy()[:, i], bins=50)
+        ax.tick_params(labelsize=18)
+        ax.ticklabel_format(style='sci', scilimits=(0, 2), axis='y')
+        ax.grid()
     fig.tight_layout()
     plt.savefig(f'covid19hist.png')
     for range_ in range(2000):
@@ -125,18 +109,10 @@ def process_data_covid(file_name, event_num=500):
         seq_name = f'{range_}'
         df_ = df.iloc[start:start + event_num]
         if df_.shape[0] < event_num:
-            #print('we are skipping becuz of length', seq_name)
             continue
 
         seq = df_.to_numpy()[:, :6].astype(np.float32)
-        #print(f'seq is {seq}')
-        #counties = df_.to_numpy()[:, -1]
-
         t, x, cases, time_diff  = seq[:, 0:1], seq[:, 1:3], seq[:, 3:4], seq[:, 4:5]
-
-
-
-        #print(seq_name, seq.shape[0])
         sequences[seq_name] = np.concatenate([t, x, cases, time_diff], axis=1)
 
         '''for i in tqdm(range(50)):

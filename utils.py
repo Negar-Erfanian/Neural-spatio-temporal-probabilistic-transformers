@@ -6,9 +6,9 @@ def get_args():
 
     parser.add_argument('--num-epochs', type=int, default=3000, help='number of epochs to train for')
     parser.add_argument('--batch-size', type=int, default=32, help='batch_size')
-    parser.add_argument('--dataset', type=str, default='earthquake', help='which dataset to work with') #earthquake #'covid19' #'citibike'
-    parser.add_argument('--model-type', type=str, default='transformer', help='which model to work with') #'benchmark', 'transformer', 'benchmark'
-    parser.add_argument('--temporal-model', type=str, default='Homoppp', help='which temporal model to work with as benchmark')  #'Homoppp', 'Hawkesppp','Selfppp'
+    parser.add_argument('--dataset', type=str, default='pinwheel', help='which dataset to work with') #earthquake #'covid19' #'citibike', 'pinwheel'
+    parser.add_argument('--model-type', type=str, default='benchmark', help='which model to work with') #'benchmark', 'transformer', 'benchmark'
+    parser.add_argument('--temporal-model', type=str, default='Hawkesppp', help='which temporal model to work with as benchmark')  #'Homoppp', 'Hawkesppp','Selfppp'
     parser.add_argument('--spatial-model', type=str, default='gmm', help='which spatial model to work with as benchmark') #'gmm', 'cond_gmm'
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--num-layers', type=int, default=6, help='number of layers of the encoder and decoder in the transformer architecture')
@@ -17,7 +17,7 @@ def get_args():
     parser.add_argument('--bij-layers', type=int, default=6, help='number of bijectors being chained')
     parser.add_argument('--NF', type=str, default=None, help='shows the overal density learned by NF')
     parser.add_argument('--NFtrain', type=str, default=True, help='Learns the overal density using NF')
-    parser.add_argument('--gpu-num', type=int, default=0, help='GPU number')
+    parser.add_argument('--gpu-num', type=int, default=3, help='GPU number')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--time_layer_prob', type=str, default='exp')
     parser.add_argument('--loc_layer_prob', type=str, default='gauss')
@@ -33,6 +33,7 @@ def get_args():
     parser.add_argument('--lookaheadmaskout', default=True)
     parser.add_argument('--seqs', default='fixed') #'variable
     parser.add_argument('--shauffled', default=True)
+    parser.add_argument('--ablation-type', default=False, help='what type of ablation study is this?') #'histindept' , 'nodecoder', False
     parser.add_argument('--notrain', dest='train', action='store_false')
 
     args, unparsed = parser.parse_known_args()

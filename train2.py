@@ -63,6 +63,7 @@ seqs = args.seqs
 shauffled = args.shauffled
 lookaheadmaskin = args.lookaheadmaskin
 lookaheadmaskout = args.lookaheadmaskout
+ablation_type = args.ablation_type
 
 regularizer1 = 0.1
 regularizer2 = 0.1
@@ -84,6 +85,8 @@ if model_type == 'transformer':
                + f'{time_layer_prob}_softsign_{loc_layer_prob}_RealNVP' \
                + '_' + f'{dropout_rate}dropout_rate'+ f'_{shauffled}_shauffled' \
                #+ f'_{lookaheadmaskin}_lookaheadmaskin' + f'_{lookaheadmaskout}_lookaheadmaskout'
+    if ablation_type != False:
+        exp_path = exp_path + f'_{ablation_type}_ablationtype'
 
 
 else:
@@ -251,7 +254,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                 if model_type == 'transformer':
                     with tf.GradientTape() as tape:
                         dec_dist_out_time, ds_out_pred_time, bij_time, dec_dist_out_loc, ds_out_pred_loc, bij_loc, att_weights_dec, att_weights_enc = \
-                            model(train_ds_in_stack, train_ds_out_stack, True, train_ds_in_lookaheadmask, train_ds_out_lookaheadmask) #train_ds_in_lookaheadmask, train_ds_out_lookaheadmask
+                            model(train_ds_in_stack, train_ds_out_stack, True, train_ds_in_lookaheadmask, train_ds_out_lookaheadmask, ablation_type) #train_ds_in_lookaheadmask, train_ds_out_lookaheadmask
                         tape.watch(model.trainable_variables)
                         loss_time = - tf.reduce_mean(bij_time.log_prob(train_ds_timediff_out))\
                                     #+regularizer1*tf.norm(tf.math.subtract(train_ds_timediff_out,ds_out_pred_time), ord=1)
@@ -308,7 +311,7 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     val_ds_out_lookaheadmask = val_mask_out
                     if model_type =='transformer':
                         val_dec_dist_time, val_ds_out_pred_time, val_bij_time, val_dec_dist_loc, val_ds_out_pred_loc, val_bij_loc, val_att_weights_dec, val_att_weights_enc = \
-                            model(val_ds_in_stack, val_ds_out_stack, False, val_ds_in_lookaheadmask, val_ds_out_lookaheadmask) #val_ds_in_lookaheadmask, val_ds_out_lookaheadmask
+                            model(val_ds_in_stack, val_ds_out_stack, False, val_ds_in_lookaheadmask, val_ds_out_lookaheadmask, ablation_type) #val_ds_in_lookaheadmask, val_ds_out_lookaheadmask
                         loss_val_time = -tf.reduce_mean(val_bij_time.log_prob(val_ds_timediff_out))\
                                         #+regularizer1 * tf.norm(tf.math.subtract(val_ds_timediff_out, val_ds_out_pred_time), ord=1)
                         loss_val_space = - tf.reduce_mean(val_bij_loc) \
@@ -328,8 +331,6 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     val_loss_metric(loss_val)
                     val_loss_metric_time(loss_val_time)
                     val_loss_metric_space(loss_val_space)
-                    #print(f'we have loc prediction outputs and true outputs in validation as {val_ds_out_pred_loc[0, :, 0]} and {val_ds_loc_out[0, :, 0]}')
-                    #print('val loss is', val_loss_metric.result().numpy())
                 valid_losses.append(val_loss_metric.result().numpy())
                 with val_summary_writer.as_default():
                     tf.summary.scalar(
@@ -397,31 +398,24 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
             test_ds_time_in, test_ds_loc_in, test_ds_mag_in, test_ds_timediff_in = test_ds_in_stack
             test_ds_time_out, test_ds_loc_out, test_ds_mag_out, test_ds_timediff_out = test_ds_out_stack
             aux_state_in  = test_ds_time_in
-            #print(f'test_ds_loc_in is {test_ds_loc_in[0]}')
-            #print(f'test_ds_mag_in is {test_ds_mag_in[0]}')
-            #print(f'test_ds_time_in is {test_ds_time_in[0]}')
-            #print(f'test_ds_loc_out is {test_ds_loc_out[0]}')
-            #print(f'test_ds_mag_out is {test_ds_mag_out[0]}')
-            #print(f'test_ds_time_out is {test_ds_time_out[0]}')
-            #tf.concat([test_ds_mag_in, test_ds_mag_out[:,0,:][..., tf.newaxis]], axis = 1)
             aux_state_out = test_ds_time_out
             if model_type =='transformer':
                 test_dec_dist_time, test_ds_out_pred_time, test_bij_time, test_dec_dist_loc, test_ds_out_pred_loc, test_bij_loc, test_att_weights_dec, test_att_weights_enc = model(
-                    test_ds_in_stack, test_ds_out_stack, False, test_ds_in_lookaheadmask, test_ds_out_lookaheadmask) #test_ds_in_lookaheadmask, test_ds_out_lookaheadmask
+                    test_ds_in_stack, test_ds_out_stack, False, test_ds_in_lookaheadmask, test_ds_out_lookaheadmask, ablation_type) #test_ds_in_lookaheadmask, test_ds_out_lookaheadmask
                 loss_test_time = -tf.reduce_mean(test_bij_time.log_prob(test_ds_timediff_out))#+regularizer1 * tf.norm(tf.math.subtract(test_ds_timediff_out, test_ds_out_pred_time), ord=1)
                 loss_test_space = -tf.reduce_mean(test_bij_loc)#+ regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
                 loss_test = loss_test_time +loss_test_space  #+regularizer1*tf.norm(tf.math.subtract(test_ds_timediff_out,test_ds_out_pred_time), ord=1)+regularizer2*tf.norm(tf.math.subtract(test_ds_loc_out,test_ds_out_pred_loc), ord=2)
                 '''experiments_figs_scores = exp_path +'/figures_train_scores/'
                 if os.path.exists(experiments_figs_scores) == False:
                     os.mkdir(experiments_figs_scores)
-                plot_att_scores(test_att_weights_dec, savepath = experiments_figs_scores, count = count)
+                plot_att_scores(test_att_weights_dec, savepath = experiments_figs_scores, count = count)'''
 
                 experiments_figs_time = exp_path + '/time_pred/'
                 if os.path.exists(experiments_figs_time) == False:
                     os.mkdir(experiments_figs_time)
                 for idx in range(len(test_ds_loc_out)):
                     plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_ds_out_pred_time,
-                                      event_num, savepath=experiments_figs_time, count=count, idx = idx)'''
+                                      event_num, savepath=experiments_figs_time, count=count, idx = idx)
                 '''experiments_figs_timeintensity = exp_path + '/time_intensity_pred/'
                 if os.path.exists(experiments_figs_timeintensity) == False:
                     os.mkdir(experiments_figs_timeintensity)
@@ -459,23 +453,23 @@ def train(num_epochs, batch_size, num_layers, num_heads, event_num, event_out, d
                     test_expected_time_diff = np.append(test_expected_time_diff, diff, axis = 1)
 
 
-                '''experiments_figs_time = exp_path + '/time_pred_benchmark/'
+                experiments_figs_time = exp_path + '/time_pred_benchmark/'
                 if os.path.exists(experiments_figs_time) == False:
                     os.mkdir(experiments_figs_time)
                 for idx in range(len(test_ds_loc_out)):
                     plot_expectedtime(test_ds_timediff_in, test_ds_timediff_out, test_expected_time_diff,
                                       event_num, savepath=experiments_figs_time, count=count, idx = idx)
-                print(f'we have time prediction outputs and true outputs as {test_expected_times[0]} and {test_ds_time_out[0]}')'''
+                print(f'we have time prediction outputs and true outputs as {test_expected_times[0]} and {test_ds_time_out[0]}')
                 curr_path = os.getcwd()
-                '''experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
+                experiments_figs_loc_gmm = exp_path + '/loc_pred_gmm/'
                 if os.path.exists(experiments_figs_loc_gmm) == False:
                     os.mkdir(experiments_figs_loc_gmm)
-               
-                for idx in range(test_ds_time_out.shape[0]):
-                    if dim == 2:
-                        plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
-                    else:
-                        plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)'''
+                if count == 3:
+                    for idx in range(test_ds_time_out.shape[0]):
+                        if dim == 2:
+                            plot_expected_2d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model, curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
+                        else:
+                            plot_expected_3d_density_gmm(test_ds_time_out[idx,:3,0][tf.newaxis], test_ds_time_in[idx,:,0][tf.newaxis], test_ds_loc_in[idx][tf.newaxis], test_ds_loc_out[idx,:3,:][tf.newaxis], aux_state_in = aux_state_in[idx][tf.newaxis], aux_state_out = aux_state_out[idx][tf.newaxis], model = model , curr_path = curr_path, savepath = experiments_figs_loc_gmm, count = count, idx = idx)
             test_loss_metric(loss_test)
             test_loss_metric_time(loss_test_time)
             test_loss_metric_space(loss_test_space)
