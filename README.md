@@ -20,12 +20,13 @@ Then launch the container
 Access the jupyter interface of the container from browser, and launch a terminal from jupyter
 
 ```bash
-
+pip3 install -r requirements.txt
 ```
 
 Test if everything is ok from the jupyter terminal
 
-``
+`python3 train.py`
+
 
 Install any missing packages in the error message
 
