@@ -2,6 +2,8 @@
 
 ## Papers
 
+Erfanian, Negar, Santiago Segarra, and Maarten V. de Hoop. "Neural multi-event forecasting on spatio-temporal point processes using probabilistically enriched transformers." (2022).
+
 ### 1. Survey papers
 
 
