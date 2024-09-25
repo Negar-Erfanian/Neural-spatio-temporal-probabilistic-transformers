@@ -17,7 +17,7 @@ def get_args():
     parser.add_argument('--bij-layers', type=int, default=6, help='number of bijectors being chained')
     parser.add_argument('--NF', type=str, default=None, help='shows the overal density learned by NF')
     parser.add_argument('--NFtrain', type=str, default=True, help='Learns the overal density using NF')
-    parser.add_argument('--gpu-num', type=int, default=3, help='GPU number')
+    parser.add_argument('--gpu-num', type=int, default=0, help='GPU number')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--time_layer_prob', type=str, default='exp')
     parser.add_argument('--loc_layer_prob', type=str, default='gauss')
