@@ -9,6 +9,10 @@ Erfanian, Negar, Santiago Segarra, and Maarten V. de Hoop. "Neural multi-event f
 
 
 ## Configure docker container on the server
+
+First clone project in your desired path:
+`git clone git@github.com:Negar-Erfanian/Neural-spatio-temporal-probabilistic-transformers.git`
+
 In ssh command, first pull docker image
 
 `docker pull tensorflow/tensorflow:latest-gpu-py3-jupyter`
